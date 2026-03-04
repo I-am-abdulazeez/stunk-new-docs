@@ -1,34 +1,54 @@
 ---
-title: Hello World
-description: Your favourite docs framework.
+title: Welcome to Stunk
+description: Framework-agnostic state management built on atomic chunks
 icon: Rocket
 ---
 
-Hey there! Fumadocs is the docs framework that also works on Tanstack Start!
+import { Cards, Card } from "fumadocs-ui/components/card";
 
-## Heading
+Stunk is a modern state management library designed for simplicity and performance. Built on atomic state principles, it breaks your state into manageable "chunks" for fine-grained reactivity.
 
-Hello World!
+## Why Stunk?
+
+- **Fine-grained reactivity** - Only affected components re-render
+- **Framework agnostic** - Works with React, Vue, Svelte, and vanilla JS
+- **Simple API** - Intuitive chunk-based state management
+- **TypeScript first** - Full type safety out of the box
+- **Async support** - Built-in handling for async operations
+
+## Quick Start
 
 <Cards>
   <Card
-    title="Learn more about Tanstack Start"
-    href="https://tanstack.com/start"
+    title="Installation"
+    description="Get started with Stunk in your project"
+    href="/docs/getting-started/installation"
   />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card
+    title="Core Concepts"
+    description="Learn about chunks and reactivity"
+    href="/docs/core-concepts/chunks"
+  />
+  <Card
+    title="API Reference"
+    description="Explore the complete API"
+    href="/docs/api-reference/chunk"
+  />
 </Cards>
 
-### CodeBlock
+## Basic Example
 
-```ts
-console.log('Hello World');
+```tsx
+import { chunk } from "stunk";
+import { useChunk } from "stunk/react";
+
+// Create a chunk
+const counterChunk = chunk(0);
+
+// Use in React component
+function Counter() {
+  const [count, setCount] = useChunk(counterChunk);
+
+  return <button onClick={() => setCount(count + 1)}>Count: {count}</button>;
+}
 ```
-
-#### Table
-
-| Head                            | Description                         |
-| ------------------------------- | ----------------------------------- |
-| `hello`                         | Hello World                         |
-| very **important**              | Hey                                 |
-| _Surprisingly_                  | Fumadocs                            |
-| very long text that looks weird | hello world hello world hello world |
