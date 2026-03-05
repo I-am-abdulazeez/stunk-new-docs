@@ -38,22 +38,22 @@ export function docsOptions(): Omit<DocsLayoutProps, "children" | "tree"> {
     ...baseOptions(),
     sidebar: {
       banner: (
-        <div
-          className="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
+        <a
+          href="/docs/getting-started/changelog"
+          className="flex items-center justify-between rounded-lg border px-3 py-2 text-xs transition-colors hover:bg-fd-accent"
           style={{
             borderColor: "rgba(42,244,194,0.2)",
             backgroundColor: "rgba(42,244,194,0.05)",
-            color: "var(--fd-muted-foreground)",
           }}
         >
+          <span className="text-fd-muted-foreground">Latest release</span>
           <span
-            className="font-semibold block mb-0.5"
-            style={{ color: "var(--stunk-teal, #2af4c2)" }}
+            className="font-semibold"
+            style={{ color: "var(--stunk-teal-text)" }}
           >
-            Stunk v2.8.1
+            v2.8.1
           </span>
-          Framework-agnostic atomic state management.
-        </div>
+        </a>
       ),
     },
   };
