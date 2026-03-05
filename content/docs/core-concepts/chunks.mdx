@@ -1,0 +1,224 @@
+---
+title: Chunks
+description: The core primitive of Stunk — a reactive, atomic unit of state.
+icon: Box
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+A **chunk** is the fundamental building block of Stunk. It's a small, self-contained reactive container that holds a single value of any type — a number, string, object, array, or anything else.
+
+```ts
+import { chunk } from "stunk";
+
+const count = chunk(0);
+const name = chunk("Fola");
+const user = chunk({ name: "Fola", age: 25 });
+const items = chunk<string[]>([]);
+```
+
+Chunks are defined **outside** components and functions. They are global reactive state — not component-local.
+
+<Callout type="warn">
+  `null` is not a valid initial value. Passing `null` to `chunk()` will throw an
+  error. Use `undefined` or a typed default instead.
+</Callout>
+
+---
+
+## API
+
+### `get()`
+
+Returns the current value of the chunk.
+
+```ts
+const count = chunk(0);
+
+count.get(); // 0
+```
+
+---
+
+### `set(value | updater)`
+
+Sets a new value. Accepts either a direct value or an updater function that receives the current value.
+
+```ts
+const count = chunk(0);
+
+// Direct value
+count.set(10);
+
+// Updater function
+count.set((prev) => prev + 1);
+
+// Works with objects too
+const user = chunk({ name: "Fola", age: 25 });
+user.set((prev) => ({ ...prev, age: 26 }));
+```
+
+<Callout type="info">
+  `set()` only notifies subscribers if the new value is **different** from the
+  current value. Setting the same value twice won't trigger a re-render.
+</Callout>
+
+**Object shape validation**
+
+When setting an object value, Stunk validates that the new value has the same shape as the existing one — same keys, same structure. This prevents accidental shape mutations at runtime.
+
+```ts
+const user = chunk({ name: "Fola", age: 25 });
+
+// ✅ Same shape — works
+user.set({ name: "Tunde", age: 30 });
+
+// ❌ Different shape — throws at runtime
+user.set({ name: "Tunde" });
+```
+
+---
+
+### `subscribe(callback)`
+
+Subscribes to value changes. The callback is called **immediately** with the current value, then on every subsequent change.
+
+Returns an **unsubscribe function** — call it to stop listening.
+
+```ts
+const count = chunk(0);
+
+const unsubscribe = count.subscribe((value) => {
+  console.log("count:", value); // called immediately with 0
+});
+
+count.set(1); // logs: "count: 1"
+count.set(2); // logs: "count: 2"
+
+// Stop listening
+unsubscribe();
+
+count.set(3); // nothing logged
+```
+
+---
+
+### `reset()`
+
+Resets the chunk back to its initial value and notifies all subscribers.
+
+```ts
+const count = chunk(0);
+
+count.set(42);
+count.get(); // 42
+
+count.reset();
+count.get(); // 0
+```
+
+---
+
+### `destroy()`
+
+Clears all subscribers, resets the value to its initial state, and removes the chunk from the internal registry. Use this for cleanup — for example, when a feature is unmounted.
+
+```ts
+const count = chunk(0);
+
+const unsub = count.subscribe(console.log);
+
+count.destroy(); // all subscribers cleared, chunk removed from registry
+```
+
+<Callout type="warn">
+  After calling `destroy()`, the chunk is no longer reactive. Any subsequent
+  `set()` calls will update the value but no subscribers will be notified.
+</Callout>
+
+---
+
+### `derive(fn)`
+
+Creates a new read-only chunk derived from this one. The derived chunk updates automatically whenever the source changes.
+
+```ts
+const price = chunk(100);
+const discounted = price.derive((p) => p * 0.9);
+
+discounted.get(); // 90
+
+price.set(200);
+discounted.get(); // 180
+```
+
+See [Derive & Select](/docs/core-concepts/derive) for full details.
+
+---
+
+## Middleware
+
+Chunks accept an optional array of middleware functions as a second argument. Middleware runs on every `set()` call and can transform or validate the incoming value.
+
+```ts
+import { chunk } from "stunk";
+import { logger, nonNegativeValidator } from "stunk/middleware";
+
+const count = chunk(0, [logger, nonNegativeValidator]);
+
+count.set(5); // logs: "Setting value: 5"
+count.set(-1); // throws: "Value must be non-negative!"
+```
+
+You can also use named middleware for better debugging:
+
+```ts
+const count = chunk(0, [
+  { name: "logger", fn: logger },
+  { name: "validator", fn: nonNegativeValidator },
+]);
+```
+
+See [Middleware](/docs/middleware/middleware) for all built-in middleware and how to write your own.
+
+---
+
+## TypeScript
+
+Chunk types are fully inferred from the initial value:
+
+```ts
+const count = chunk(0); // Chunk<number>
+const name = chunk("Stunk"); // Chunk<string>
+const user = chunk({ name: "Fola", age: 25 }); // Chunk<{ name: string; age: number }>
+```
+
+You can also provide an explicit type:
+
+```ts
+const items = chunk<string[]>([]);
+const status = chunk<"idle" | "loading" | "error">("idle");
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Derive & Select"
+    description="Create reactive derived state from a chunk"
+    href="/docs/core-concepts/derive"
+  />
+  <Card
+    title="Computed"
+    description="Derive state from multiple chunks at once"
+    href="/docs/core-concepts/computed"
+  />
+  <Card
+    title="Batch Updates"
+    description="Group multiple updates into a single render"
+    href="/docs/core-concepts/batch-updates"
+  />
+</Cards>
