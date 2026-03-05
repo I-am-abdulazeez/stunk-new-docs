@@ -23,7 +23,7 @@ interface CodeScene {
 }
 
 const TOKEN_COLORS: Record<TokenType, string> = {
-  keyword: "var(--stunk-teal)",
+  keyword: "var(--stunk-teal-text)",
   fn: "#79c0ff",
   string: "#a5d6ff",
   number: "#f8c8a0",
@@ -280,7 +280,7 @@ export default function TypewriterCode() {
               }}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
                 i === sceneIdx
-                  ? "bg-(--stunk-teal)/15 text-(--stunk-teal) border border-(--stunk-teal)/30"
+                  ? "bg-(--stunk-teal-text)/15 text-(--stunk-teal-text) border border-(--stunk-teal-text)/30"
                   : "text-fd-muted-foreground hover:text-fd-foreground"
               }`}
             >
@@ -298,7 +298,7 @@ export default function TypewriterCode() {
           <span
             className="inline-block w-0.5 h-[1em] align-middle ml-px"
             style={{
-              backgroundColor: "var(--stunk-teal)",
+              backgroundColor: "var(--stunk-teal-text)",
               animation: "blink 1s step-end infinite",
             }}
           />
