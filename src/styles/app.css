@@ -65,3 +65,13 @@
 .stagger-5 {
   animation-delay: 0.65s;
 }
+
+/* Inline code — light mode */
+.prose code:not(pre code) {
+  color: var(--stunk-teal-text);
+}
+
+/* Inline code — dark mode */
+.dark .prose code:not(pre code) {
+  color: var(--stunk-teal);
+}
