@@ -1,19 +1,16 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 import type { DocsLayoutProps } from "fumadocs-ui/layouts/docs";
-import { source } from "@/lib/source";
-import { Github, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
+
+import stunkLogo from "@/assets/stunk-logo.png";
+import { RiGithubLine } from "react-icons/ri";
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: (
         <span className="flex items-center gap-2 font-bold text-base tracking-tight">
-          <span
-            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-black text-xs font-black"
-            style={{ backgroundColor: "var(--stunk-teal, #2af4c2)" }}
-          >
-            S
-          </span>
+          <img src={stunkLogo} alt="Stunk" className="w-6 h-6" />
           Stunk
         </span>
       ),
@@ -29,7 +26,7 @@ export function baseOptions(): BaseLayoutProps {
         text: "GitHub",
         url: "https://github.com/I-am-abdulazeez/stunk",
         external: true,
-        icon: <Github className="w-4 h-4" />,
+        icon: <RiGithubLine className="w-4 h-4" />,
       },
     ],
     githubUrl: "https://github.com/I-am-abdulazeez/stunk",
