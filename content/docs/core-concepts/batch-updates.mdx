@@ -1,0 +1,124 @@
+---
+title: Batch Updates
+description: Group multiple chunk updates into a single notification cycle.
+icon: Layers
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+By default, every `set()` call immediately notifies all subscribers. If you update multiple chunks at once, each update triggers a separate notification — which means a separate re-render per chunk.
+
+`batch()` solves this by grouping all updates inside a callback into a **single notification cycle**. All chunks are updated first, then all subscribers are notified once.
+
+```ts
+import { chunk, batch } from "stunk";
+
+const firstName = chunk("Fola");
+const lastName = chunk("Ade");
+const age = chunk(25);
+
+// Without batch — 3 separate notifications
+firstName.set("Tunde");
+lastName.set("Bello");
+age.set(30);
+
+// With batch — 1 notification after all three updates
+batch(() => {
+  firstName.set("Tunde");
+  lastName.set("Bello");
+  age.set(30);
+});
+```
+
+---
+
+## How it works
+
+When `batch()` runs:
+
+1. A batching flag is set internally
+2. Every `set()` call marks the chunk as "dirty" instead of notifying immediately
+3. After the callback finishes, all dirty chunks notify their subscribers at once
+4. The batching flag is cleared
+
+This means subscribers only receive one update per batch, with the **final value** after all mutations.
+
+---
+
+## With React
+
+In React, each chunk update that triggers a re-render is expensive. `batch()` is especially useful when updating multiple related chunks that feed into the same component:
+
+```tsx
+import { chunk, batch } from "stunk";
+import { useChunk } from "stunk/react";
+
+const firstName = chunk("Fola");
+const lastName = chunk("Ade");
+
+function NameForm() {
+  const [first, setFirst] = useChunk(firstName);
+  const [last, setLast] = useChunk(lastName);
+
+  const handleReset = () => {
+    // Component re-renders once, not twice
+    batch(() => {
+      setFirst("Fola");
+      setLast("Ade");
+    });
+  };
+
+  return (
+    <div>
+      <p>
+        {first} {last}
+      </p>
+      <button onClick={handleReset}>Reset</button>
+    </div>
+  );
+}
+```
+
+<Callout type="info">
+  React 18 automatically batches state updates in event handlers via automatic
+  batching. `batch()` is still useful for updates outside of React events —
+  timeouts, async callbacks, or vanilla JS code.
+</Callout>
+
+---
+
+## Nested batches
+
+`batch()` calls can be nested safely. The outer batch controls when notifications fire — inner batches don't trigger early notifications.
+
+```ts
+batch(() => {
+  firstName.set("Tunde");
+
+  batch(() => {
+    lastName.set("Bello"); // still batched by outer
+    age.set(30);
+  });
+
+  // notifications still haven't fired
+});
+// all three notify here, once
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Async State"
+    description="Handle async operations with built-in loading and error states"
+    href="/docs/async/async-chunk"
+  />
+  <Card
+    title="Middleware"
+    description="Extend chunks with logging, persistence, and validation"
+    href="/docs/middleware/middleware"
+  />
+</Cards>
