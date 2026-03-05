@@ -1,54 +1,128 @@
 ---
-title: Welcome to Stunk
-description: Framework-agnostic state management built on atomic chunks
+title: Stunk
+description: A lightweight, framework-agnostic state management library built on atomic chunk principles.
 icon: Rocket
 ---
 
 import { Cards, Card } from "fumadocs-ui/components/card";
+import { Callout } from "fumadocs-ui/components/callout";
 
-Stunk is a modern state management library designed for simplicity and performance. Built on atomic state principles, it breaks your state into manageable "chunks" for fine-grained reactivity.
+Stunk is a **lightweight, reactive state management library** built on atomic principles. Instead of one giant global store, you break state into small, independent pieces called **chunks** — each one self-contained, reactive, and composable.
 
-## Why Stunk?
+No reducers. No boilerplate. No magic. Just state.
 
-- **Fine-grained reactivity** - Only affected components re-render
-- **Framework agnostic** - Works with React, Vue, Svelte, and vanilla JS
-- **Simple API** - Intuitive chunk-based state management
-- **TypeScript first** - Full type safety out of the box
-- **Async support** - Built-in handling for async operations
+```ts
+import { chunk } from "stunk";
 
-## Quick Start
+const count = chunk(0);
+
+count.get(); // 0
+count.set(1); // set directly
+count.set((n) => n + 1); // or derive from previous
+count.reset(); // back to 0
+```
+
+<Callout type="info">
+  Stunk is framework-agnostic at its core. React, Vue, Svelte, Solid, or vanilla
+  JS — it works everywhere. Official React integration ships with the package
+  via `stunk/react`.
+</Callout>
+
+## How it works
+
+Every piece of state in Stunk is a **chunk** — a tiny reactive container that holds a single value. Chunks can be read, updated, subscribed to, derived from, and composed together.
+
+```ts
+import { chunk, computed } from "stunk";
+
+const price = chunk(100);
+const quantity = chunk(3);
+
+// Derived from a single chunk
+const discounted = price.derive((p) => p * 0.9);
+
+// Computed from multiple chunks
+const total = computed([price, quantity], (p, q) => p * q);
+
+total.get(); // 300 — updates automatically when price or quantity changes
+```
+
+Think of chunks as the atoms of your application state. Small, focused, and composable.
+
+## Key Features
 
 <Cards>
   <Card
-    title="Installation"
-    description="Get started with Stunk in your project"
-    href="/docs/getting-started/installation"
-  />
-  <Card
-    title="Core Concepts"
-    description="Learn about chunks and reactivity"
+    title="Atomic State"
+    description="Break state into independent chunks. No global store, no coupling."
     href="/docs/core-concepts/chunks"
   />
   <Card
-    title="API Reference"
-    description="Explore the complete API"
-    href="/docs/api-reference/chunk"
+    title="Fine-Grained Reactivity"
+    description="Only the components that depend on a chunk re-render when it changes."
+    href="/docs/core-concepts/chunks"
+  />
+  <Card
+    title="Derive & Computed"
+    description="Derive state from one chunk or compose across multiple with full reactivity."
+    href="/docs/core-concepts/derive"
+  />
+  <Card
+    title="Async Support"
+    description="Built-in loading, error, and data states for async operations."
+    href="/docs/async/async-chunk"
+  />
+  <Card
+    title="Middleware"
+    description="Extend chunks with logging, persistence, validation and more."
+    href="/docs/middleware/middleware"
+  />
+  <Card
+    title="Time Travel"
+    description="Undo and redo state changes with built-in history management."
+    href="/docs/time-travel/time-travel"
   />
 </Cards>
 
-## Basic Example
+## React in 30 seconds
+
+If you're using React, the `stunk/react` integration gives you hooks that are reactive out of the box:
 
 ```tsx
 import { chunk } from "stunk";
 import { useChunk } from "stunk/react";
 
-// Create a chunk
-const counterChunk = chunk(0);
+const counter = chunk(0);
 
-// Use in React component
 function Counter() {
-  const [count, setCount] = useChunk(counterChunk);
+  const [count, setCount] = useChunk(counter);
 
-  return <button onClick={() => setCount(count + 1)}>Count: {count}</button>;
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount((n) => n + 1)}>Increment</button>
+    </div>
+  );
 }
 ```
+
+The component re-renders only when `counter` changes — nothing else.
+
+## Installation
+
+<InstallTabs />
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Installation"
+    description="Set up Stunk in your project"
+    href="/docs/getting-started/installation"
+  />
+  <Card
+    title="Core Concepts: Chunks"
+    description="Understand the foundation of Stunk state"
+    href="/docs/core-concepts/chunks"
+  />
+</Cards>
