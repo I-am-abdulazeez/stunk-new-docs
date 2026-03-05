@@ -10,6 +10,8 @@ import {
   DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
+import * as TabsComponents from "fumadocs-ui/components/tabs";
+import { InstallTabs } from "@/components/install-tabs";
 import { docsOptions } from "@/lib/layout.shared";
 import { useFumadocsLoader } from "fumadocs-core/source/client";
 
@@ -38,7 +40,13 @@ const clientLoader = browserCollections.docs.createClientLoader({
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <DocsBody>
-          <MDX components={{ ...defaultMdxComponents }} />
+          <MDX
+            components={{
+              ...defaultMdxComponents,
+              ...TabsComponents,
+              InstallTabs,
+            }}
+          />
         </DocsBody>
       </DocsPage>
     );
