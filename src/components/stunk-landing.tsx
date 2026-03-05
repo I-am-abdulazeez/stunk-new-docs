@@ -23,7 +23,6 @@ import {
   RiAngularjsFill,
   RiJavascriptFill,
   RiGithubLine,
-  RiGuideLine,
 } from "react-icons/ri";
 import { SiSvelte, SiSolid } from "react-icons/si";
 import InstallCommand from "./landings/commands";
@@ -194,7 +193,7 @@ export default function StunkLanding() {
                     href="https://github.com/I-am-abdulazeez/stunk"
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm border border-fd-border hover:border-(--stunk-teal-text)/40 transition-all"
                   >
-                    <RiGuideLine className="w-4 h-4" />
+                    <RiGithubLine className="w-4 h-4" />
                     GitHub
                     <ChevronRight className="w-3.5 h-3.5 text-fd-muted-foreground" />
                   </a>
