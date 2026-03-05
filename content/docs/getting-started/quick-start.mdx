@@ -1,0 +1,205 @@
+---
+title: Quick Start
+description: Go from zero to reactive state in under 5 minutes.
+icon: Zap
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+
+This guide walks you through the core Stunk workflow — creating state, reading it, updating it, and reacting to changes.
+
+<Callout type="info">
+  Make sure you've completed [Installation](/docs/getting-started/installation)
+  before continuing.
+</Callout>
+
+---
+
+<Steps>
+
+<Step>
+
+## Create a chunk
+
+A **chunk** is the fundamental unit of state in Stunk. You create one by calling `chunk()` with an initial value.
+
+```ts
+import { chunk } from "stunk";
+
+const count = chunk(0);
+const username = chunk("Fola");
+const user = chunk({ name: "Fola", age: 25 });
+```
+
+Chunks are defined **outside** components or functions — they are global reactive containers, not component-local state.
+
+</Step>
+
+<Step>
+
+## Read and update state
+
+Every chunk has `get()`, `set()`, and `reset()` methods.
+
+```ts
+// Read the current value
+count.get(); // 0
+
+// Set a new value directly
+count.set(10);
+
+// Update based on the previous value
+count.set((prev) => prev + 1); // 11
+
+// Reset back to the initial value
+count.reset(); // 0
+```
+
+`set()` accepts either a new value or an updater function — no separate `update()` needed.
+
+</Step>
+
+<Step>
+
+## Subscribe to changes
+
+Use `subscribe()` to react to state changes outside of a framework:
+
+```ts
+const unsubscribe = count.subscribe((value) => {
+  console.log("count changed:", value);
+});
+
+count.set(5); // logs: "count changed: 5"
+count.set(6); // logs: "count changed: 6"
+
+// Clean up when done
+unsubscribe();
+```
+
+</Step>
+
+<Step>
+
+## Use in React
+
+Import `useChunk` from `stunk/react` to bind a chunk to a React component:
+
+```tsx
+import { chunk } from "stunk";
+import { useChunk } from "stunk/react";
+
+// Define state outside the component
+const counter = chunk(0);
+
+function Counter() {
+  const [count, setCount] = useChunk(counter);
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount((n) => n + 1)}>Increment</button>
+      <button onClick={() => setCount(0)}>Reset</button>
+    </div>
+  );
+}
+```
+
+The component re-renders **only** when `counter` changes — nothing else triggers a re-render.
+
+</Step>
+
+<Step>
+
+## Derive state
+
+Derive a new reactive value from an existing chunk using `.derive()`:
+
+```ts
+const price = chunk(100);
+
+// Automatically updates when price changes
+const discounted = price.derive((p) => p * 0.9);
+
+price.set(200);
+discounted.get(); // 180
+```
+
+For deriving from **multiple chunks**, use `computed()`:
+
+```ts
+import { chunk, computed } from "stunk";
+
+const price = chunk(100);
+const quantity = chunk(3);
+
+const total = computed([price, quantity], (p, q) => p * q);
+
+total.get(); // 300
+
+quantity.set(5);
+total.get(); // 500 — automatically recomputed
+```
+
+</Step>
+
+</Steps>
+
+---
+
+## Putting it all together
+
+Here's a complete example combining chunks, derived state, and React hooks:
+
+```tsx
+import { chunk, computed } from "stunk";
+import { useChunk, useComputed } from "stunk/react";
+
+// State
+const price = chunk(50);
+const quantity = chunk(2);
+
+// Derived
+const total = computed([price, quantity], (p, q) => p * q);
+
+function Cart() {
+  const [qty, setQty] = useChunk(quantity);
+  const totalValue = useComputed([price, quantity], (p, q) => p * q);
+
+  return (
+    <div>
+      <p>Price: ${price.get()}</p>
+      <p>Quantity: {qty}</p>
+      <p>Total: ${totalValue}</p>
+      <button onClick={() => setQty((n) => n + 1)}>Add item</button>
+      <button onClick={() => setQty((n) => Math.max(0, n - 1))}>
+        Remove item
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Core Concepts: Chunks"
+    description="Deep dive into everything chunks can do"
+    href="/docs/core-concepts/chunks"
+  />
+  <Card
+    title="Async State"
+    description="Handle loading, error, and data states with asyncChunk"
+    href="/docs/async/async-chunk"
+  />
+  <Card
+    title="React Integration"
+    description="Explore all the React hooks Stunk provides"
+    href="/docs/integrations/react"
+  />
+</Cards>
