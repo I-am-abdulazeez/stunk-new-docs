@@ -7,6 +7,11 @@
 :root {
   --stunk-teal: #2af4c2;
   --stunk-teal-dim: #20dcad;
+  --stunk-teal-text: #0a9e7f;
+
+  .dark {
+    --stunk-teal-text: #2af4c2;
+  }
 }
 
 * {
