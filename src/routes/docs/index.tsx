@@ -11,6 +11,7 @@ import {
 } from "fumadocs-ui/layouts/docs/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import * as TabsComponents from "fumadocs-ui/components/tabs";
+import * as StepsComponents from "fumadocs-ui/components/steps";
 import { InstallTabs } from "@/components/install-tabs";
 import { docsOptions } from "@/lib/layout.shared";
 import { useFumadocsLoader } from "fumadocs-core/source/client";
@@ -43,6 +44,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
           <MDX
             components={{
               ...defaultMdxComponents,
+              ...StepsComponents,
               ...TabsComponents,
               InstallTabs,
             }}
