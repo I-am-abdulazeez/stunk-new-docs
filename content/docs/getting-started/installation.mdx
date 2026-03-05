@@ -1,0 +1,132 @@
+---
+title: Installation
+description: Get Stunk up and running in your project in under a minute.
+icon: Package
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Install
+
+Stunk has zero dependencies. Install the core package with your package manager of choice:
+
+<InstallTabs />
+
+That's it. No config files, no providers, no boilerplate.
+
+---
+
+## Package Exports
+
+Stunk ships three importable paths:
+
+| Import             | Description                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `stunk`            | Core state management — `chunk`, `computed`, `asyncChunk`, `batch`, and more           |
+| `stunk/react`      | React hooks — `useChunk`, `useChunkValue`, `useDerive`, `useComputed`, `useAsyncChunk` |
+| `stunk/middleware` | Middleware utilities — `logger`, `persist`, and custom middleware helpers              |
+
+```ts
+import { chunk } from "stunk";
+import { useChunk } from "stunk/react";
+import { logger } from "stunk/middleware";
+```
+
+---
+
+## Framework Setup
+
+### Vanilla JS / TypeScript
+
+No setup required. Import and use directly:
+
+```ts
+import { chunk } from "stunk";
+
+const count = chunk(0);
+
+count.set(1);
+console.log(count.get()); // 1
+```
+
+### React
+
+Stunk supports React **17, 18, and 19**. React is a peer dependency — if it's already in your project, you're good.
+
+```tsx
+import { chunk } from "stunk";
+import { useChunk } from "stunk/react";
+
+const counter = chunk(0);
+
+function Counter() {
+  const [count, setCount] = useChunk(counter);
+
+  return <button onClick={() => setCount((n) => n + 1)}>Count: {count}</button>;
+}
+```
+
+<Callout type="info">
+  Chunks are defined **outside** components. This is intentional — a chunk is
+  global reactive state, not component-local state. Define it once, use it
+  anywhere.
+</Callout>
+
+### Vue (WIP)
+
+Vue support is currently in progress via `stunk/vue`. Follow the [GitHub repo](https://github.com/I-am-abdulazeez/stunk) for updates.
+
+---
+
+## TypeScript
+
+Stunk is written in TypeScript and ships its own types — no `@types/stunk` needed. Full type inference works out of the box:
+
+```ts
+import { chunk } from "stunk";
+
+const count = chunk(0); // Chunk<number>
+const name = chunk("Stunk"); // Chunk<string>
+const user = chunk({ name: "Fola", age: 25 }); // Chunk<{ name: string; age: number }>
+
+// TypeScript will catch this at compile time:
+count.set("hello"); // ❌ Argument of type 'string' is not assignable to 'number'
+```
+
+---
+
+## Requirements
+
+| Requirement | Version                                                  |
+| ----------- | -------------------------------------------------------- |
+| TypeScript  | `^5.0.0` (optional but recommended)                      |
+| React       | `^17.0.0 \|\| ^18.0.0 \|\| ^19.0.0` (optional)           |
+| Vue         | `^3.5.13` (optional, WIP)                                |
+| Node.js     | Any modern version supporting ES2020                     |
+| Bundler     | Vite, Webpack, Rollup, esbuild — anything ESM-compatible |
+
+<Callout type="info">
+  Stunk outputs both **ESM** and **CJS** formats, so it works in any modern
+  JavaScript environment — browser, Node.js, or edge runtimes.
+</Callout>
+
+---
+
+## What's next?
+
+Now that you have Stunk installed, learn about the core primitive — **chunks**:
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+<Cards>
+  <Card
+    title="Core Concepts: Chunks"
+    description="Understand how chunks work and what you can do with them"
+    href="/docs/core-concepts/chunks"
+  />
+  <Card
+    title="React Integration"
+    description="Explore all the React hooks Stunk provides"
+    href="/docs/integrations/react"
+  />
+</Cards>
