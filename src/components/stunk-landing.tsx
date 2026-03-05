@@ -1,6 +1,4 @@
 "use client";
-
-import React, { useEffect, useState, useRef } from "react";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 import {
   Zap,
@@ -11,7 +9,6 @@ import {
   Clock,
   Shield,
   ArrowRight,
-  Github,
   Check,
   Layers,
   Cpu,
@@ -25,11 +22,15 @@ import {
   RiVuejsFill,
   RiAngularjsFill,
   RiJavascriptFill,
+  RiGithubLine,
+  RiGuideLine,
 } from "react-icons/ri";
 import { SiSvelte, SiSolid } from "react-icons/si";
 import InstallCommand from "./landings/commands";
 import TypewriterCode from "./landings/typewriter";
 import AnimatedStateFlow from "./landings/state-flow";
+
+import stunkLogo from "@/assets/stunk-logo.png";
 
 const FEATURES = [
   {
@@ -91,7 +92,22 @@ const FRAMEWORKS = [
 export default function StunkLanding() {
   return (
     <HomeLayout
-      nav={{ title: "Stunk", url: "/" }}
+      nav={{
+        title: (
+          <span className="flex items-center gap-2 font-bold">
+            <img
+              src={stunkLogo}
+              alt="Stunk"
+              className="w-6 h-6 object-contain"
+            />
+            Stunk
+          </span>
+        ),
+        url: "/",
+        transparentMode: "always",
+        enableHoverToOpen: false,
+        enabled: true,
+      }}
       links={[
         { text: "Documentation", url: "/docs" },
         {
@@ -140,7 +156,7 @@ export default function StunkLanding() {
                   style={{
                     borderColor: "rgba(42,244,194,0.25)",
                     backgroundColor: "rgba(42,244,194,0.06)",
-                    color: "var(--stunk-teal)",
+                    color: "var(--stunk-teal-text)",
                   }}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
@@ -176,9 +192,9 @@ export default function StunkLanding() {
                   </a>
                   <a
                     href="https://github.com/I-am-abdulazeez/stunk"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm border border-fd-border hover:border-(--stunk-teal)/40 transition-all"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm border border-fd-border hover:border-(--stunk-teal-text)/40 transition-all"
                   >
-                    <Github className="w-4 h-4" />
+                    <RiGuideLine className="w-4 h-4" />
                     GitHub
                     <ChevronRight className="w-3.5 h-3.5 text-fd-muted-foreground" />
                   </a>
@@ -210,7 +226,7 @@ export default function StunkLanding() {
                 <div key={stat.label}>
                   <div
                     className="text-2xl font-bold"
-                    style={{ color: "var(--stunk-teal)" }}
+                    style={{ color: "var(--stunk-teal-text)" }}
                   >
                     {stat.value}
                   </div>
@@ -232,7 +248,7 @@ export default function StunkLanding() {
             <div className="text-center mb-16">
               <p
                 className="text-xs font-semibold uppercase tracking-widest mb-3"
-                style={{ color: "var(--stunk-teal)" }}
+                style={{ color: "var(--stunk-teal-text)" }}
               >
                 Why Stunk
               </p>
@@ -249,10 +265,10 @@ export default function StunkLanding() {
               {FEATURES.map(({ icon: Icon, title, desc }) => (
                 <div
                   key={title}
-                  className="group rounded-xl border border-fd-border bg-fd-card p-6 hover:border-(--stunk-teal)/40 transition-all duration-300 hover:bg-[rgba(42,244,194,0.02)]"
+                  className="group rounded-xl border border-fd-border bg-fd-card p-6 hover:border-(--stunk-teal-text)/40 transition-all duration-300 hover:bg-[rgba(42,244,194,0.02)]"
                 >
                   <div
-                    className="inline-flex p-2.5 rounded-lg mb-4 border transition-colors group-hover:border-(--stunk-teal)/40"
+                    className="inline-flex p-2.5 rounded-lg mb-4 border transition-colors group-hover:border-(--stunk-teal-text)/40"
                     style={{
                       backgroundColor: "rgba(42,244,194,0.07)",
                       borderColor: "rgba(42,244,194,0.15)",
@@ -260,7 +276,7 @@ export default function StunkLanding() {
                   >
                     <Icon
                       className="w-5 h-5"
-                      style={{ color: "var(--stunk-teal)" }}
+                      style={{ color: "var(--stunk-teal-text)" }}
                     />
                   </div>
                   <h3 className="font-semibold text-base mb-2">{title}</h3>
@@ -292,7 +308,7 @@ export default function StunkLanding() {
                   key={name}
                   className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border transition-all ${
                     status === "ready"
-                      ? "border-(--stunk-teal)/25 bg-[rgba(42,244,194,0.04)]"
+                      ? "border-(--stunk-teal-text)/25 bg-[rgba(42,244,194,0.04)]"
                       : "border-fd-border bg-fd-card"
                   } ${status === "soon" ? "opacity-50" : ""}`}
                 >
@@ -301,7 +317,7 @@ export default function StunkLanding() {
                     style={{
                       color:
                         status === "ready"
-                          ? "var(--stunk-teal)"
+                          ? "var(--stunk-teal-text)"
                           : "var(--fd-muted-foreground)",
                     }}
                   />
@@ -310,7 +326,9 @@ export default function StunkLanding() {
                       status === "ready" ? "" : "text-fd-muted-foreground"
                     }`}
                     style={
-                      status === "ready" ? { color: "var(--stunk-teal)" } : {}
+                      status === "ready"
+                        ? { color: "var(--stunk-teal-text)" }
+                        : {}
                     }
                   >
                     {name}
@@ -318,7 +336,7 @@ export default function StunkLanding() {
                   {status === "ready" && (
                     <span
                       className="flex items-center gap-1 text-[10px] font-medium"
-                      style={{ color: "var(--stunk-teal)" }}
+                      style={{ color: "var(--stunk-teal-text)" }}
                     >
                       <Check className="w-3 h-3" /> Ready
                     </span>
@@ -354,7 +372,7 @@ export default function StunkLanding() {
               style={{
                 borderColor: "rgba(42,244,194,0.2)",
                 backgroundColor: "rgba(42,244,194,0.05)",
-                color: "var(--stunk-teal)",
+                color: "var(--stunk-teal-text)",
               }}
             >
               <Package className="w-3.5 h-3.5" />
@@ -384,7 +402,7 @@ export default function StunkLanding() {
                 href="https://github.com/I-am-abdulazeez/stunk"
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-lg font-semibold border border-fd-border hover:bg-fd-accent transition-all"
               >
-                <Github className="w-4 h-4" />
+                <RiGithubLine className="w-4 h-4" />
                 View on GitHub
               </a>
             </div>
