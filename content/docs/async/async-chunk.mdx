@@ -1,0 +1,232 @@
+---
+title: Async Chunk
+description: Handle async operations with built-in loading, error, and data states.
+icon: RefreshCw
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`asyncChunk()` wraps an async fetcher function and gives you reactive `loading`, `error`, `data`, and `reload` states out of the box — no manual state juggling needed.
+
+```ts
+import { asyncChunk } from "stunk";
+
+const userChunk = asyncChunk(async () => {
+  const res = await fetch("/api/user");
+  return res.json();
+});
+```
+
+The chunk fetches immediately on creation and keeps its state reactive. Subscribe to it or use it in React with `useAsyncChunk`.
+
+---
+
+## State shape
+
+Every async chunk exposes these reactive properties:
+
+| Property  | Type                  | Description                                          |
+| --------- | --------------------- | ---------------------------------------------------- |
+| `data`    | `T \| null`           | The resolved value, or `null` before first fetch     |
+| `loading` | `boolean`             | `true` while a fetch is in progress                  |
+| `error`   | `E \| null`           | The error if the last fetch failed, otherwise `null` |
+| `reload`  | `() => Promise<void>` | Manually trigger a refetch                           |
+
+---
+
+## API reference
+
+### `reload(params?)`
+
+Forces a fresh fetch, ignoring stale time. Optionally pass new params.
+
+```ts
+await postsChunk.reload();
+await postsChunk.reload({ category: "engineering" });
+```
+
+### `refresh(params?)`
+
+Smart refresh — only fetches if data is stale (respects `staleTime`). Does nothing if data is still fresh.
+
+```ts
+await postsChunk.refresh();
+```
+
+### `mutate(mutator)`
+
+Update `data` directly without triggering a network request. Useful for optimistic updates.
+
+```ts
+postsChunk.mutate((current) => [...(current ?? []), newPost]);
+```
+
+### `setParams(params)`
+
+Update the fetcher params and immediately trigger a fresh fetch.
+
+```ts
+postsChunk.setParams({ category: "engineering" });
+```
+
+### `reset()`
+
+Resets back to initial state and re-fetches from scratch.
+
+```ts
+postsChunk.reset();
+```
+
+### `cleanup()`
+
+Clears any active polling intervals and cache timers. Call this when you're done with the chunk.
+
+```ts
+postsChunk.cleanup();
+```
+
+---
+
+```ts
+import { asyncChunk } from "stunk";
+
+const postsChunk = asyncChunk(async () => {
+  const res = await fetch("/api/posts");
+  return res.json() as Promise<Post[]>;
+});
+
+// Read current state
+const { data, loading, error } = postsChunk.get();
+
+// Subscribe to changes
+postsChunk.subscribe(({ data, loading, error }) => {
+  console.log({ data, loading, error });
+});
+
+// Refetch manually
+await postsChunk.reload();
+```
+
+---
+
+## With parameters
+
+Pass parameters to the fetcher using the `params` option:
+
+```ts
+const postChunk = asyncChunk(async ({ id }: { id: string }) => {
+  const res = await fetch(`/api/posts/${id}`);
+  return res.json() as Promise<Post>;
+});
+
+// Set params and trigger a fetch
+postChunk.setParams({ id: "42" });
+```
+
+---
+
+## Retry on failure
+
+Configure automatic retries with `retryCount` and `retryDelay`:
+
+```ts
+const dataChunk = asyncChunk(fetcher, {
+  retryCount: 3, // retry up to 3 times
+  retryDelay: 1000, // wait 1s between retries
+});
+```
+
+---
+
+## Stale & cache time
+
+Control how long data is considered fresh and how long it stays cached:
+
+```ts
+const dataChunk = asyncChunk(fetcher, {
+  staleTime: 30_000, // data is fresh for 30s — won't refetch
+  cacheTime: 60_000, // cache is kept for 60s after last subscriber leaves
+});
+```
+
+---
+
+## Error handling
+
+Use the `onError` callback to react to failures:
+
+```ts
+const dataChunk = asyncChunk(fetcher, {
+  onError: (error) => {
+    console.error("Fetch failed:", error.message);
+  },
+});
+```
+
+Or read `error` directly from state:
+
+```ts
+const { error } = dataChunk.get();
+if (error) {
+  console.error(error.message);
+}
+```
+
+---
+
+## In React
+
+Use `useAsyncChunk` to consume async state reactively in a component:
+
+```tsx
+import { asyncChunk } from "stunk";
+import { useAsyncChunk } from "stunk/react";
+
+const postsChunk = asyncChunk(async () => {
+  const res = await fetch("/api/posts");
+  return res.json() as Promise<Post[]>;
+});
+
+function PostList() {
+  const { data, loading, error, reload } = useAsyncChunk(postsChunk);
+
+  if (loading) return <p>Loading...</p>;
+  if (error)
+    return (
+      <p>
+        Error: {error.message} <button onClick={reload}>Retry</button>
+      </p>
+    );
+
+  return (
+    <ul>
+      {data?.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+<Callout type="info">
+  `useAsyncChunk` automatically triggers the initial fetch and re-renders the
+  component whenever `loading`, `data`, or `error` changes.
+</Callout>
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Infinite Async Chunk"
+    description="Paginated async state with infinite scroll support"
+    href="/docs/async/infinite-async-chunk"
+  />
+  <Card
+    title="Middleware"
+    description="Extend chunks with logging, persistence, and validation"
+    href="/docs/middleware/middleware"
+  />
+</Cards>
