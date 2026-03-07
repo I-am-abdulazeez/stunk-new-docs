@@ -64,17 +64,17 @@ discounted.destroy();
 
 ## In React
 
-Derive your data **outside** the component, then pass it to `useChunk()`:
+Derive your data **outside** the component, then pass it to `useChunkValue()` since you're only reading:
 
 ```tsx
 import { chunk } from "stunk";
-import { useChunk } from "stunk/react";
+import { useChunkValue } from "stunk/react";
 
 const price = chunk(100);
 const discounted = price.derive((p) => p * 0.9); // derived outside
 
 function DiscountedPrice() {
-  const [value] = useChunk(discounted); // just use useChunk
+  const value = useChunkValue(discounted); // read-only
 
   return <p>Discounted: ${value}</p>;
 }
@@ -82,8 +82,8 @@ function DiscountedPrice() {
 
 <Callout type="warn">
   `useDerive` exists in v2 but will be **removed in v3**. It adds no value over
-  deriving outside the component and passing to `useChunk()`. Start using the
-  pattern above now.
+  deriving outside the component and passing to `useChunkValue()`. Start using
+  the pattern above now.
 </Callout>
 
 ---

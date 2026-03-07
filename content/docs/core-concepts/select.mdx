@@ -1,7 +1,7 @@
 ---
 title: Select
 description: Create a read-only derived chunk from a single source with optional shallow equality.
-icon: Filter
+icon: MousePointer2
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -94,17 +94,17 @@ Use `.derive()` for simple value transforms. Use `select()` when you're slicing 
 
 ## In React
 
-Derive outside the component, then pass to `useChunk()`:
+Derive outside the component, then pass to `useChunkValue()` since selectors are read-only:
 
 ```tsx
 import { chunk, select } from "stunk";
-import { useChunk } from "stunk/react";
+import { useChunkValue } from "stunk/react";
 
 const user = chunk({ name: "Fola", age: 25, role: "admin" });
 const userName = select(user, (u) => u.name, { useShallowEqual: true });
 
 function UserName() {
-  const [name] = useChunk(userName);
+  const name = useChunkValue(userName); // read-only
 
   return <p>Hello, {name}</p>;
 }
@@ -112,7 +112,8 @@ function UserName() {
 
 <Callout type="warn">
   `useDerive` exists in v2 but will be **removed in v3**. Derive or select
-  outside the component and pass the result directly to `useChunk()` instead.
+  outside the component and pass the result directly to `useChunkValue()`
+  instead.
 </Callout>
 
 ---

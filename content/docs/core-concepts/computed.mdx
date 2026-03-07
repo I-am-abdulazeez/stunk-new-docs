@@ -127,23 +127,27 @@ const summary = computed(
 
 ## In React
 
-Use `useComputed` to consume computed state in a component:
+Derive outside the component, then pass to `useChunkValue()` since computed is read-only:
 
 ```tsx
-import { chunk } from "stunk";
-import { useComputed } from "stunk/react";
+import { chunk, computed } from "stunk";
+import { useChunkValue } from "stunk/react";
 
 const price = chunk(100);
 const quantity = chunk(2);
+const total = computed([price, quantity], (p, q) => p * q); // outside component
 
 function OrderSummary() {
-  const total = useComputed([price, quantity], (p, q) => p * q);
+  const totalValue = useChunkValue(total); // read-only
 
-  return <p>Total: ${total}</p>;
+  return <p>Total: ${totalValue}</p>;
 }
 ```
 
-The component only re-renders when the computed result changes — not every time a dependency updates.
+<Callout type="warn">
+  `useComputed` exists in v2 but will be **removed in v3**. Compute outside the
+  component and pass the result directly to `useChunkValue()` instead.
+</Callout>
 
 ---
 
