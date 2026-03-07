@@ -108,6 +108,25 @@ batch(() => {
 
 ---
 
+## With computed chunks
+
+`batch()` works correctly with `computed()` — the computed value is recalculated after all source chunks have been updated, not after each individual update:
+
+```ts
+const price = chunk(100);
+const quantity = chunk(3);
+const total = computed([price, quantity], (p, q) => p * q);
+
+batch(() => {
+  price.set(50);
+  quantity.set(10);
+});
+
+total.get(); // 500 — computed once after both updates
+```
+
+---
+
 ## What's next?
 
 <Cards>
