@@ -1,4 +1,4 @@
 {
   "title": "Core Concepts",
-  "pages": ["chunks", "derive", "batch-updates"]
+  "pages": ["chunks", "derive", "computed", "batch-updates"]
 }
