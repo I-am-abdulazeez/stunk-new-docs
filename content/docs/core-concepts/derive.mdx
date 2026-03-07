@@ -1,19 +1,13 @@
 ---
-title: Derive & Select
-description: Create reactive derived state from a single chunk using .derive() and select().
+title: Derive
+description: Create reactive derived state from a single chunk using .derive().
 icon: GitBranch
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-Stunk provides two ways to derive state from a single chunk — `.derive()` as a method directly on the chunk, and `select()` as a standalone function with more control over equality checking.
-
----
-
-## `.derive(fn)`
-
-The simplest way to create derived state. Call `.derive()` on any chunk with a transformation function — the result is a new reactive chunk that updates automatically.
+`.derive()` is a method on every chunk that creates a new reactive chunk based on a transformation function. The derived chunk updates automatically whenever the source changes.
 
 ```ts
 import { chunk } from "stunk";
@@ -29,9 +23,11 @@ discounted.get(); // 180
 formatted.get(); // "$200.00"
 ```
 
-The derived chunk is **read-only** — it updates when the source updates, but you can't set it directly. Modifying the source is the only way to change it.
+The derived chunk is **read-only** — you can't set it directly. Update the source chunk instead.
 
-### Chaining derives
+---
+
+## Chaining
 
 Derived chunks can themselves be derived:
 
@@ -44,11 +40,13 @@ count.set(5);
 label.get(); // "Value: 10"
 ```
 
-### Cleanup
+---
+
+## Cleanup
 
 A derived chunk stays subscribed to its source as long as both exist. If you destroy the **source chunk**, the derived chunk stops receiving updates automatically.
 
-If you want to stop a derived chunk from updating while keeping the source alive, call `destroy()` on the derived chunk — this unsubscribes it from the source and frees memory:
+If you want to stop a derived chunk from updating while keeping the source alive, call `destroy()` on the derived chunk:
 
 ```ts
 const discounted = price.derive((p) => p * 0.9);
@@ -58,97 +56,35 @@ discounted.destroy();
 ```
 
 <Callout type="info">
-  In React, hooks like `useDerive` handle cleanup automatically when the
-  component unmounts. Manual `destroy()` is only needed when using derived
-  chunks outside of React.
+  In React, cleanup happens automatically when the component unmounts. Manual
+  `destroy()` is only needed when using derived chunks outside of React.
 </Callout>
-
----
-
-## `select()`
-
-`select()` is a standalone function that creates a read-only derived chunk from a source chunk. It gives you more control than `.derive()` — specifically, **shallow equality checking** to prevent unnecessary updates when deriving objects.
-
-```ts
-import { chunk } from "stunk";
-import { select } from "stunk";
-
-const user = chunk({ name: "Fola", age: 25, role: "admin" });
-
-// Only re-renders when `name` changes — ignores age and role changes
-const userName = select(user, (u) => u.name);
-
-userName.get(); // "Fola"
-```
-
-### Shallow equality
-
-By default, `select()` uses strict reference equality (`!==`) to detect changes. For object selectors, this means a new object reference always triggers an update — even if the contents are the same.
-
-Enable `useShallowEqual` to avoid unnecessary updates when the selector returns a new object with the same values:
-
-```ts
-const user = chunk({ name: "Fola", age: 25, scores: [10, 20] });
-
-// Without shallow equal — updates every time user changes
-const basicInfo = select(user, (u) => ({ name: u.name, age: u.age }));
-
-// With shallow equal — only updates when name or age actually changes
-const basicInfo = select(user, (u) => ({ name: u.name, age: u.age }), {
-  useShallowEqual: true,
-});
-```
-
-### Read-only enforcement
-
-`select()` enforces read-only access. Calling `set()` or `reset()` on a selector chunk throws an error:
-
-```ts
-const userName = select(user, (u) => u.name);
-
-userName.set("Tunde"); // ❌ throws: "Cannot set values directly on a selector"
-userName.reset(); // ❌ throws: "Cannot reset a selector chunk"
-```
-
-To update the value, modify the source chunk instead:
-
-```ts
-user.set((prev) => ({ ...prev, name: "Tunde" }));
-userName.get(); // "Tunde"
-```
-
----
-
-## `.derive()` vs `select()`
-
-|                  | `.derive()`       | `select()`                                   |
-| ---------------- | ----------------- | -------------------------------------------- |
-| Syntax           | Method on chunk   | Standalone function                          |
-| Read-only        | Yes               | Yes                                          |
-| Shallow equality | No                | Yes (`useShallowEqual`)                      |
-| Chainable        | Yes               | Yes (chains return new selectors)            |
-| Use case         | Simple transforms | Object slices, performance-sensitive derives |
-
-Use `.derive()` for simple transformations. Use `select()` when you're extracting a slice of an object chunk and want to avoid unnecessary re-renders.
 
 ---
 
 ## In React
 
-Use `useDerive` to consume a derived value reactively in a component:
+Derive your data **outside** the component, then pass it to `useChunk()`:
 
 ```tsx
 import { chunk } from "stunk";
-import { useDerive } from "stunk/react";
+import { useChunk } from "stunk/react";
 
 const price = chunk(100);
+const discounted = price.derive((p) => p * 0.9); // derived outside
 
 function DiscountedPrice() {
-  const discounted = useDerive(price, (p) => p * 0.9);
+  const [value] = useChunk(discounted); // just use useChunk
 
-  return <p>Discounted: ${discounted}</p>;
+  return <p>Discounted: ${value}</p>;
 }
 ```
+
+<Callout type="warn">
+  `useDerive` exists in v2 but will be **removed in v3**. It adds no value over
+  deriving outside the component and passing to `useChunk()`. Start using the
+  pattern above now.
+</Callout>
 
 ---
 
@@ -156,13 +92,13 @@ function DiscountedPrice() {
 
 <Cards>
   <Card
+    title="Select"
+    description="Read-only derived chunks with shallow equality support"
+    href="/docs/core-concepts/select"
+  />
+  <Card
     title="Computed"
     description="Derive from multiple chunks simultaneously"
     href="/docs/core-concepts/computed"
-  />
-  <Card
-    title="Batch Updates"
-    description="Group multiple updates into a single render"
-    href="/docs/core-concepts/batch-updates"
   />
 </Cards>
