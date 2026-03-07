@@ -1,0 +1,224 @@
+---
+title: Infinite Async Chunk
+description: Paginated async state with automatic infinite scroll support.
+icon: Infinity
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`infiniteAsyncChunk()` is built on top of `asyncChunk()` and handles paginated data in **accumulate mode** — each page load appends to the existing list rather than replacing it. It's designed specifically for infinite scroll UIs.
+
+```ts
+import { infiniteAsyncChunk } from "stunk";
+
+const postsChunk = infiniteAsyncChunk(
+  async ({ page, pageSize }) => {
+    const res = await fetch(`/api/posts?page=${page}&limit=${pageSize}`);
+    const json = await res.json();
+    return {
+      data: json.posts,
+      hasMore: json.hasMore,
+      total: json.total,
+    };
+  },
+  { pageSize: 20 },
+);
+```
+
+---
+
+## API reference
+
+`infiniteAsyncChunk` inherits all `asyncChunk` APIs — `reload()`, `refresh()`, `mutate()`, `setParams()`, `reset()`, `cleanup()` — and adds the following:
+
+### `nextPage()`
+
+Loads the next page and appends results to the existing data.
+
+```ts
+await postsChunk.nextPage();
+```
+
+Stops automatically when `hasMore` is `false`.
+
+### `resetPagination()`
+
+Resets back to page 1 and clears accumulated data, then re-fetches.
+
+```ts
+await postsChunk.resetPagination();
+```
+
+<Callout type="info">
+  `prevPage()` and `goToPage()` are **not available** on `infiniteAsyncChunk` — infinite scroll is forward-only. If you need bidirectional pagination, use `asyncChunk` directly with `pagination: { mode: 'replace' }`.
+</Callout>
+
+---
+
+On each `nextPage()` call, the fetcher receives an incremented `page` number alongside your `pageSize`. Results are **accumulated** — new items are appended to `data` rather than replacing it. Pagination stops automatically when `hasMore` is `false`.
+
+---
+
+## Fetcher shape
+
+The fetcher always receives `page` and `pageSize` automatically — you don't need to manage them:
+
+```ts
+async ({ page, pageSize, ...yourParams }) => {
+  // fetch page `page` of size `pageSize`
+  return {
+    data: T[],       // required — items for this page
+    hasMore?: boolean, // optional — whether more pages exist
+    total?: number,    // optional — total item count
+  };
+}
+```
+
+---
+
+## Options
+
+| Option       | Type              | Default | Description                            |
+| ------------ | ----------------- | ------- | -------------------------------------- |
+| `pageSize`   | `number`          | `10`    | Number of items per page               |
+| `staleTime`  | `number`          | —       | ms before data is considered stale     |
+| `cacheTime`  | `number`          | —       | ms to keep cache after last subscriber |
+| `retryCount` | `number`          | —       | Number of retries on failure           |
+| `retryDelay` | `number`          | —       | ms between retries                     |
+| `onError`    | `(error) => void` | —       | Error callback                         |
+
+---
+
+## In React
+
+Use `useInfiniteAsyncChunk` to wire up infinite scroll with **zero manual observer setup**. Attach the returned `observerTarget` ref to a sentinel element at the bottom of your list — the hook handles the rest automatically.
+
+```tsx
+import { infiniteAsyncChunk } from "stunk";
+import { useInfiniteAsyncChunk } from "stunk/react";
+
+const postsChunk = infiniteAsyncChunk(
+  async ({ page, pageSize }) => {
+    const res = await fetch(`/api/posts?page=${page}&limit=${pageSize}`);
+    const json = await res.json();
+    return { data: json.posts, hasMore: json.hasMore };
+  },
+  { pageSize: 20 },
+);
+
+function PostFeed() {
+  const {
+    data,
+    loading,
+    error,
+    hasMore,
+    isFetchingMore,
+    loadMore,
+    observerTarget,
+  } = useInfiniteAsyncChunk(postsChunk);
+
+  if (loading && !data?.length) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+
+  return (
+    <div>
+      <ul>
+        {data?.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+
+      {/* Sentinel — triggers next page automatically when visible */}
+      <div ref={observerTarget} />
+
+      {isFetchingMore && <p>Loading more...</p>}
+      {!hasMore && <p>You've reached the end.</p>}
+    </div>
+  );
+}
+```
+
+---
+
+## `useInfiniteAsyncChunk` return values
+
+| Value            | Type                        | Description                                                 |
+| ---------------- | --------------------------- | ----------------------------------------------------------- |
+| `data`           | `T[] \| null`               | All accumulated items so far                                |
+| `loading`        | `boolean`                   | `true` during any fetch                                     |
+| `error`          | `E \| null`                 | Error from the latest failed fetch                          |
+| `hasMore`        | `boolean`                   | Whether more pages are available                            |
+| `isFetchingMore` | `boolean`                   | `true` when loading a subsequent page (data already exists) |
+| `loadMore`       | `() => void`                | Manually trigger the next page                              |
+| `observerTarget` | `RefObject<HTMLDivElement>` | Attach to a sentinel element for auto-loading               |
+| `reload`         | `() => Promise<void>`       | Reload from page 1, clearing accumulated data               |
+| `refresh`        | `() => Promise<void>`       | Refresh current data without resetting pagination           |
+
+---
+
+## Manual pagination
+
+If you don't want auto-scroll behavior, set `autoLoad: false` and use `loadMore` yourself:
+
+```tsx
+const { data, loadMore, hasMore, isFetchingMore } = useInfiniteAsyncChunk(
+  postsChunk,
+  { autoLoad: false },
+);
+
+return (
+  <div>
+    {data?.map((post) => (
+      <li key={post.id}>{post.title}</li>
+    ))}
+    {hasMore && (
+      <button onClick={loadMore} disabled={isFetchingMore}>
+        {isFetchingMore ? "Loading..." : "Load more"}
+      </button>
+    )}
+  </div>
+);
+```
+
+---
+
+## With extra params
+
+You can pass custom params alongside the auto-managed `page` and `pageSize`:
+
+```ts
+const postsChunk = infiniteAsyncChunk<Post, Error, { category: string }>(
+  async ({ page, pageSize, category }) => {
+    const res = await fetch(
+      `/api/posts?page=${page}&limit=${pageSize}&category=${category}`,
+    );
+    const json = await res.json();
+    return { data: json.posts, hasMore: json.hasMore };
+  },
+);
+
+postsChunk.setParams({ category: "engineering" });
+```
+
+<Callout type="info">
+  `page` and `pageSize` are always injected automatically — never pass them
+  yourself in `setParams`.
+</Callout>
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Middleware"
+    description="Extend chunks with logging, persistence, and validation"
+    href="/docs/middleware/middleware"
+  />
+  <Card
+    title="React Integration"
+    description="All React hooks for working with Stunk"
+    href="/docs/integrations/react"
+  />
+</Cards>
