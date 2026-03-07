@@ -1,0 +1,176 @@
+---
+title: Computed
+description: Derive reactive state from multiple chunks using computed().
+icon: Cpu
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`computed()` creates a derived chunk that depends on **multiple source chunks**. It automatically recomputes whenever any of its dependencies change, and only notifies subscribers when the result actually differs from the previous value.
+
+```ts
+import { chunk, computed } from "stunk";
+
+const price = chunk(100);
+const quantity = chunk(3);
+
+const total = computed([price, quantity], (p, q) => p * q);
+
+total.get(); // 300
+
+quantity.set(5);
+total.get(); // 500 — recomputed automatically
+```
+
+---
+
+## API
+
+```ts
+computed(dependencies, computeFn): Computed<TResult>
+```
+
+| Parameter      | Type                     | Description                                          |
+| -------------- | ------------------------ | ---------------------------------------------------- |
+| `dependencies` | `Chunk<any>[]`           | Array of source chunks to depend on                  |
+| `computeFn`    | `(...values) => TResult` | Function receiving current values of each dependency |
+
+The argument order in `computeFn` matches the order of `dependencies`.
+
+---
+
+## The `Computed` interface
+
+A computed chunk extends `Chunk<T>` with two additional methods:
+
+### `isDirty()`
+
+Returns `true` if any dependency has changed since the last computation. Stunk uses this internally to decide whether to recompute — you can also use it yourself for debugging or optimization.
+
+```ts
+const total = computed([price, quantity], (p, q) => p * q);
+
+total.isDirty(); // false
+
+price.set(200);
+total.isDirty(); // false — already recomputed synchronously
+```
+
+### `recompute()`
+
+Manually forces recomputation from current dependency values. Normally you don't need this — Stunk recomputes automatically on every dependency change.
+
+```ts
+total.recompute();
+```
+
+---
+
+## Read-only enforcement
+
+Like `select()`, computed chunks are **read-only**. Calling `set()` throws an error:
+
+```ts
+const total = computed([price, quantity], (p, q) => p * q);
+
+total.set(999); // ❌ throws: "Cannot set values directly on computed"
+```
+
+To change the result, update the source chunks:
+
+```ts
+price.set(50);
+total.get(); // 150 (50 * 3)
+```
+
+`reset()` on a computed chunk resets **all its dependencies** back to their initial values:
+
+```ts
+price.set(200);
+quantity.set(10);
+
+total.reset(); // resets price and quantity to their initial values
+total.get(); // 300 (100 * 3)
+```
+
+---
+
+## Performance
+
+Stunk uses a fast path for primitives and shallow equality for objects to avoid unnecessary updates:
+
+- For **primitives** (numbers, strings, booleans) — strict `!==` comparison
+- For **objects** — `shallowEqual` check to avoid re-notifying when the shape and values are the same
+
+This means computed chunks only propagate updates when the result genuinely changes.
+
+---
+
+## TypeScript
+
+Types flow through automatically from dependencies:
+
+```ts
+const price = chunk(100); // Chunk<number>
+const quantity = chunk(3); // Chunk<number>
+const label = chunk("Total"); // Chunk<string>
+
+const summary = computed(
+  [price, quantity, label],
+  (p, q, l) => `${l}: $${p * q}`, // (number, number, string) => string
+);
+// Computed<string>
+```
+
+---
+
+## In React
+
+Use `useComputed` to consume computed state in a component:
+
+```tsx
+import { chunk } from "stunk";
+import { useComputed } from "stunk/react";
+
+const price = chunk(100);
+const quantity = chunk(2);
+
+function OrderSummary() {
+  const total = useComputed([price, quantity], (p, q) => p * q);
+
+  return <p>Total: ${total}</p>;
+}
+```
+
+The component only re-renders when the computed result changes — not every time a dependency updates.
+
+---
+
+## Coming in v3
+
+The `computed()` API is being redesigned in v3 to automatically detect dependencies — no more arrays:
+
+```ts
+// v3 — auto dependency tracking
+const total = computed(() => price.get() * quantity.get());
+```
+
+The v2 API will remain supported during the transition.
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Batch Updates"
+    description="Group multiple chunk updates into a single render cycle"
+    href="/docs/core-concepts/batch-updates"
+  />
+  <Card
+    title="Async State"
+    description="Handle async operations with built-in loading and error states"
+    href="/docs/async/async-chunk"
+  />
+</Cards>
