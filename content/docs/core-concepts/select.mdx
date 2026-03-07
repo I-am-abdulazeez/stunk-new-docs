@@ -1,0 +1,133 @@
+---
+title: Select
+description: Create a read-only derived chunk from a single source with optional shallow equality.
+icon: Filter
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`select()` creates a **read-only derived chunk** from a source chunk using a selector function. It's similar to `.derive()` but gives you an extra option — **shallow equality checking** — which is useful when your selector returns objects and you want to avoid unnecessary updates.
+
+```ts
+import { chunk, select } from "stunk";
+
+const user = chunk({ name: "Fola", age: 25, role: "admin" });
+
+const userName = select(user, (u) => u.name);
+
+userName.get(); // "Fola"
+
+user.set((prev) => ({ ...prev, age: 26 }));
+userName.get(); // "Fola" — didn't change, no update triggered
+```
+
+---
+
+## Shallow equality
+
+By default, `select()` uses strict reference equality (`!==`) to detect changes — same as `.derive()`. This is fine for primitives, but for object selectors it means a new object reference always triggers an update even if the contents are identical.
+
+Enable `useShallowEqual` to compare object contents instead:
+
+```ts
+const user = chunk({ name: "Fola", age: 25 });
+
+// Without useShallowEqual — new object reference = always updates
+const info = select(user, (u) => ({ name: u.name, age: u.age }));
+
+// With useShallowEqual — only updates when name or age actually changes
+const info = select(user, (u) => ({ name: u.name, age: u.age }), {
+  useShallowEqual: true,
+});
+```
+
+This is especially useful in React — it prevents unnecessary re-renders when selecting a slice of a large object chunk.
+
+---
+
+## Read-only enforcement
+
+`select()` is strictly read-only. Calling `set()` or `reset()` throws:
+
+```ts
+const userName = select(user, (u) => u.name);
+
+userName.set("Tunde"); // ❌ "Cannot set values directly on a selector"
+userName.reset(); // ❌ "Cannot reset a selector chunk"
+```
+
+Update the source chunk instead:
+
+```ts
+user.set((prev) => ({ ...prev, name: "Tunde" }));
+userName.get(); // "Tunde"
+```
+
+---
+
+## Chaining
+
+Selectors can be chained — each chain returns a new selector that inherits the same options:
+
+```ts
+const user = chunk({ profile: { name: "Fola", age: 25 } });
+const profile = select(user, (u) => u.profile);
+const userName = select(profile, (p) => p.name);
+```
+
+---
+
+## `select()` vs `.derive()`
+
+|                  | `.derive()`       | `select()`                              |
+| ---------------- | ----------------- | --------------------------------------- |
+| Syntax           | Method on chunk   | Standalone import from `stunk`          |
+| Read-only        | Yes               | Yes                                     |
+| Shallow equality | No                | Yes (`useShallowEqual`)                 |
+| Chainable        | Yes               | Yes                                     |
+| Best for         | Simple transforms | Object slices, perf-sensitive selectors |
+
+Use `.derive()` for simple value transforms. Use `select()` when you're slicing an object chunk and want precise control over when updates propagate.
+
+---
+
+## In React
+
+Derive outside the component, then pass to `useChunk()`:
+
+```tsx
+import { chunk, select } from "stunk";
+import { useChunk } from "stunk/react";
+
+const user = chunk({ name: "Fola", age: 25, role: "admin" });
+const userName = select(user, (u) => u.name, { useShallowEqual: true });
+
+function UserName() {
+  const [name] = useChunk(userName);
+
+  return <p>Hello, {name}</p>;
+}
+```
+
+<Callout type="warn">
+  `useDerive` exists in v2 but will be **removed in v3**. Derive or select
+  outside the component and pass the result directly to `useChunk()` instead.
+</Callout>
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Computed"
+    description="Derive from multiple chunks simultaneously"
+    href="/docs/core-concepts/computed"
+  />
+  <Card
+    title="Batch Updates"
+    description="Group multiple updates into a single render"
+    href="/docs/core-concepts/batch-updates"
+  />
+</Cards>
