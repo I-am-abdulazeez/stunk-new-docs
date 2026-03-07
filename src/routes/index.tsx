@@ -1,6 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { HomeLayout } from "fumadocs-ui/layouts/home";
-import { baseOptions } from "@/lib/layout.shared";
+import { createFileRoute } from "@tanstack/react-router";
 import StunkLanding from "@/components/stunk-landing";
 
 export const Route = createFileRoute("/")({
