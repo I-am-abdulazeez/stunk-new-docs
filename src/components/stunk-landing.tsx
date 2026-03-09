@@ -147,7 +147,7 @@ export default function StunkLanding() {
             }}
           />
 
-          <div className="relative container max-w-6xl mx-auto px-6 pt-28 pb-16">
+          <div className="relative container max-w-7xl mx-auto px-6 pt-28 pb-16">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
                 <div
