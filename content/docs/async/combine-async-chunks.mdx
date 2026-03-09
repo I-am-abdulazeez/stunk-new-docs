@@ -1,0 +1,136 @@
+---
+title: Combine Async Chunks
+description: Merge multiple async chunks into a single reactive state object.
+icon: Combine
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`combineAsyncChunks()` merges multiple async chunks into a single reactive chunk. Instead of subscribing to each async chunk individually, you get one unified state with combined `loading`, `error`, and `data` — keyed by the names you provide.
+
+```ts
+import { asyncChunk, combineAsyncChunks } from "stunk";
+
+const userChunk = asyncChunk(() => fetchUser());
+const postsChunk = asyncChunk(() => fetchPosts());
+
+const combined = combineAsyncChunks({ user: userChunk, posts: postsChunk });
+
+combined.get();
+// {
+//   loading: true,
+//   error: null,
+//   errors: {},
+//   data: { user: null, posts: null }
+// }
+```
+
+---
+
+## State shape
+
+| Property  | Type                 | Description                                              |
+| --------- | -------------------- | -------------------------------------------------------- |
+| `loading` | `boolean`            | `true` if **any** of the source chunks is loading        |
+| `error`   | `Error \| null`      | The first error encountered across all chunks, or `null` |
+| `errors`  | `Record<key, Error>` | Per-chunk errors, keyed by the name you provided         |
+| `data`    | `Record<key, T>`     | Per-chunk data, keyed by the name you provided           |
+
+---
+
+## Basic usage
+
+```ts
+import { asyncChunk, combineAsyncChunks } from "stunk";
+
+const userChunk = asyncChunk(() => fetchUser());
+const settingsChunk = asyncChunk(() => fetchSettings());
+const notifChunk = asyncChunk(() => fetchNotifications());
+
+const appData = combineAsyncChunks({
+  user: userChunk,
+  settings: settingsChunk,
+  notifications: notifChunk,
+});
+
+appData.subscribe(({ loading, error, data }) => {
+  if (loading) return;
+  console.log(data.user, data.settings, data.notifications);
+});
+```
+
+---
+
+## Error handling
+
+`error` holds the **first** error encountered. `errors` gives you per-chunk granularity — useful for showing targeted error messages:
+
+```ts
+const { error, errors, data } = appData.get();
+
+if (errors.user) console.error("User fetch failed:", errors.user.message);
+if (errors.settings)
+  console.error("Settings fetch failed:", errors.settings.message);
+```
+
+---
+
+## In React
+
+Use `useChunkValue` to consume the combined state reactively — it's read-only:
+
+```tsx
+import { asyncChunk, combineAsyncChunks } from "stunk";
+import { useChunkValue } from "stunk/react";
+
+const userChunk = asyncChunk(() => fetchUser());
+const postsChunk = asyncChunk(() => fetchPosts());
+
+const combined = combineAsyncChunks({ user: userChunk, posts: postsChunk });
+
+function Dashboard() {
+  const { loading, error, errors, data } = useChunkValue(combined);
+
+  if (loading) return <p>Loading...</p>;
+
+  return (
+    <div>
+      {errors.user && <p>Failed to load user: {errors.user.message}</p>}
+      {errors.posts && <p>Failed to load posts: {errors.posts.message}</p>}
+
+      {data.user && <p>Welcome, {data.user.name}</p>}
+      {data.posts && (
+        <ul>
+          {data.posts.map((p) => (
+            <li key={p.id}>{p.title}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+```
+
+<Callout type="info">
+  `loading` is `true` as long as **any** source chunk is still loading — even if
+  others have already resolved. Each chunk fetches independently and the
+  combined state updates reactively as each one completes.
+</Callout>
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="React Integration"
+    description="All React hooks for working with Stunk"
+    href="/docs/integrations/react"
+  />
+  <Card
+    title="Middleware"
+    description="Extend chunks with logging, persistence, and validation"
+    href="/docs/middleware/middleware"
+  />
+</Cards>
