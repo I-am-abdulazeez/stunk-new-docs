@@ -5,6 +5,7 @@
     "getting-started",
     "core-concepts",
     "async",
+    "middleware",
     "api-reference"
   ]
 }
