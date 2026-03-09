@@ -1,4 +1,4 @@
 {
   "title": "Async",
-  "pages": ["async-chunk", "infinite-async-chunk"]
+  "pages": ["async-chunk", "infinite-async-chunk", "combine-async-chunks"]
 }
