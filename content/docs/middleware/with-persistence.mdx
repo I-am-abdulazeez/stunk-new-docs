@@ -1,0 +1,113 @@
+---
+title: withPersistence
+description: Persist chunk state to localStorage or any Web Storage API.
+icon: HardDrive
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`withPersistence()` wraps an existing chunk and automatically syncs its value to a storage backend — `localStorage` by default. The persisted value is loaded back on initialization, so state survives page refreshes.
+
+```ts
+import { chunk } from "stunk";
+import { withPersistence } from "stunk/middleware";
+
+const theme = chunk<"light" | "dark">("light");
+const persistedTheme = withPersistence(theme, { key: "app-theme" });
+
+persistedTheme.set("dark");
+// stored in localStorage under "app-theme"
+
+// On next page load — automatically restored to "dark"
+```
+
+---
+
+## API reference
+
+`withPersistence()` returns the same `Chunk<T>` interface — no extra methods. The persistence is entirely transparent.
+
+```ts
+withPersistence(baseChunk, options): Chunk<T>
+```
+
+### Options
+
+| Option        | Type                   | Default          | Description                                 |
+| ------------- | ---------------------- | ---------------- | ------------------------------------------- |
+| `key`         | `string`               | **required**     | The storage key to persist under            |
+| `storage`     | `Storage`              | `localStorage`   | Any object implementing the Web Storage API |
+| `serialize`   | `(value: T) => string` | `JSON.stringify` | Custom serializer                           |
+| `deserialize` | `(value: string) => T` | `JSON.parse`     | Custom deserializer                         |
+
+---
+
+## Custom storage
+
+Pass any object that implements the Web Storage API (`getItem`, `setItem`) — for example `sessionStorage`:
+
+```ts
+const sessionTheme = withPersistence(theme, {
+  key: "app-theme",
+  storage: sessionStorage,
+});
+```
+
+---
+
+## Custom serialization
+
+Use `serialize` and `deserialize` for values that don't serialize cleanly with `JSON.stringify` — like `Date` objects:
+
+```ts
+const lastVisited = chunk(new Date());
+
+const persisted = withPersistence(lastVisited, {
+  key: "last-visited",
+  serialize: (date) => date.toISOString(),
+  deserialize: (str) => new Date(str),
+});
+```
+
+---
+
+## Error handling
+
+`withPersistence` catches and logs errors from both loading and saving — a corrupt storage entry won't crash your app. The chunk simply falls back to its initial value if deserialization fails.
+
+<Callout type="warn">
+  `withPersistence` uses `localStorage` by default, which is only available in
+  browser environments. In SSR or server environments, pass a custom `storage`
+  implementation or guard the call with `typeof window !== 'undefined'`.
+</Callout>
+
+---
+
+## Combining with other middleware
+
+`withPersistence` wraps a chunk after creation, so it composes naturally with chunk middleware and `withHistory`:
+
+```ts
+import { chunk } from "stunk";
+import { logger } from "stunk/middleware";
+import { withHistory, withPersistence } from "stunk/middleware";
+
+const count = chunk(0, [logger]);
+const withTime = withHistory(count);
+const persisted = withPersistence(withTime, { key: "count" });
+
+// All three layers active — logger on set(), history tracking, and persistence
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="React Integration"
+    description="All React hooks for working with Stunk"
+    href="/docs/integrations/react"
+  />
+</Cards>
