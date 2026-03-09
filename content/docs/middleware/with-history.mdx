@@ -127,22 +127,25 @@ countWithHistory.canRedo(); // false
 ```tsx
 import { chunk } from "stunk";
 import { withHistory } from "stunk/middleware";
-import { useChunk, useChunkValue } from "stunk/react";
+import { useChunk } from "stunk/react";
 
-const text = chunk("");
-const textWithHistory = withHistory(text);
+const counter = chunk(0);
+const counterWithHistory = withHistory(counter);
 
-function Editor() {
-  const [value, setValue] = useChunk(textWithHistory);
-  const canUndo = useChunkValue(/* use a derived chunk or inline */
+function Counter() {
+  const [count, setCount] = useChunk(counterWithHistory);
+
+  const canUndo = counterWithHistory.canUndo();
+  const canRedo = counterWithHistory.canRedo();
 
   return (
     <div>
-      <textarea value={value} onChange={e => setValue(e.target.value)} />
-      <button onClick={() => textWithHistory.undo()} disabled={!textWithHistory.canUndo()}>
+      <p>{count}</p>
+      <button onClick={() => setCount((c) => c + 1)}>Increment</button>
+      <button onClick={() => counterWithHistory.undo()} disabled={!canUndo}>
         Undo
       </button>
-      <button onClick={() => textWithHistory.redo()} disabled={!textWithHistory.canRedo()}>
+      <button onClick={() => counterWithHistory.redo()} disabled={!canRedo}>
         Redo
       </button>
     </div>
@@ -150,11 +153,7 @@ function Editor() {
 }
 ```
 
-<Callout type="info">
-  `canUndo()` and `canRedo()` are not reactive by themselves. To reactively
-  disable buttons based on history state, derive a chunk from them or read them
-  inside event handlers as shown above.
-</Callout>
+Since `useChunk` subscribes to the chunk and calls `setState` on every change, the component re-renders whenever the value updates — and `canUndo()` / `canRedo()` are re-evaluated as part of that render, keeping the buttons in sync automatically.
 
 ---
 
