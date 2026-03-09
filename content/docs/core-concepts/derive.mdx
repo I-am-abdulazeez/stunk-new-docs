@@ -15,12 +15,12 @@ import { chunk } from "stunk";
 const price = chunk(100);
 
 const discounted = price.derive((p) => p * 0.9);
-const formatted = price.derive((p) => `$${p.toFixed(2)}`);
+const formatted = price.derive((p) => `₦${p.toFixed(2)}`);
 
 price.set(200);
 
 discounted.get(); // 180
-formatted.get(); // "$200.00"
+formatted.get(); // "₦200.00"
 ```
 
 The derived chunk is **read-only** — you can't set it directly. Update the source chunk instead.

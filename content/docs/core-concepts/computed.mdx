@@ -118,7 +118,7 @@ const label = chunk("Total"); // Chunk<string>
 
 const summary = computed(
   [price, quantity, label],
-  (p, q, l) => `${l}: $${p * q}`, // (number, number, string) => string
+  (p, q, l) => `${l}: ₦${p * q}`, // (number, number, string) => string
 );
 // Computed<string>
 ```
