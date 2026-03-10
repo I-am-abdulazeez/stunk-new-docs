@@ -1,0 +1,298 @@
+---
+title: React
+description: Official React integration for Stunk — hooks for reading, writing, and subscribing to chunks.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+Stunk's React integration is available from `stunk/react`. It provides hooks that subscribe to chunks and trigger re-renders only when the relevant value changes.
+
+```ts
+import {
+  useChunk,
+  useChunkValue,
+  useAsyncChunk,
+  useInfiniteAsyncChunk,
+} from "stunk/react";
+```
+
+---
+
+## `useChunk`
+
+The primary hook for reading and writing a chunk. Returns `[value, set, reset, destroy]`.
+
+```tsx
+import { chunk } from "stunk";
+import { useChunk } from "stunk/react";
+
+const count = chunk(0);
+
+function Counter() {
+  const [count, setCount, resetCount] = useChunk(counter);
+
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={() => setCount((c) => c + 1)}>Increment</button>
+      <button onClick={resetCount}>Reset</button>
+    </div>
+  );
+}
+```
+
+### With a selector
+
+`useChunk` accepts an optional selector to subscribe to a slice of the value. The component only re-renders when the selected slice changes:
+
+```tsx
+const user = chunk({ name: "Fola", age: 25, role: "admin" });
+
+function UserName() {
+  const [name, setUser] = useChunk(user, (u) => u.name);
+  // only re-renders when name changes
+}
+```
+
+### Return value
+
+```ts
+const [value, set, reset, destroy] = useChunk(chunk, selector?);
+```
+
+|           | Type                         | Description                                 |
+| --------- | ---------------------------- | ------------------------------------------- |
+| `value`   | `T`                          | Current chunk value (or selected slice)     |
+| `set`     | `(value \| updater) => void` | Update the chunk                            |
+| `reset`   | `() => void`                 | Reset to initial value                      |
+| `destroy` | `() => void`                 | Destroy the chunk and clear all subscribers |
+
+---
+
+## `useChunkValue`
+
+Read-only version of `useChunk`. Use this when a component only needs to read a value — no setter needed.
+
+```tsx
+import { useChunkValue } from "stunk/react";
+
+const theme = chunk<"light" | "dark">("light");
+
+function ThemeDisplay() {
+  const currentTheme = useChunkValue(theme);
+
+  return <p>Theme: {currentTheme}</p>;
+}
+```
+
+Also accepts a selector:
+
+```tsx
+const user = chunk({ name: "Fola", age: 25 });
+
+function UserAge() {
+  const age = useChunkValue(user, (u) => u.age);
+
+  return <p>Age: {age}</p>;
+}
+```
+
+This is the preferred hook for derived chunks, computed chunks, and selectors — since those are all read-only:
+
+```tsx
+const price = chunk(100);
+const discounted = price.derive((p) => p * 0.9);
+
+function DiscountedPrice() {
+  const value = useChunkValue(discounted);
+
+  return <p>Discounted: ${value}</p>;
+}
+```
+
+---
+
+## `useAsyncChunk`
+
+Subscribes to an async chunk and returns its full state with all async methods.
+
+```tsx
+import { asyncChunk } from "stunk";
+import { useAsyncChunk } from "stunk/react";
+
+const postsChunk = asyncChunk(async () => {
+  const res = await fetch("/api/posts");
+  return res.json() as Promise<Post[]>;
+});
+
+function PostList() {
+  const { data, loading, error, reload } = useAsyncChunk(postsChunk);
+
+  if (loading) return <p>Loading...</p>;
+  if (error)
+    return (
+      <p>
+        Error: {error.message} <button onClick={reload}>Retry</button>
+      </p>
+    );
+
+  return (
+    <ul>
+      {data?.map((p) => (
+        <li key={p.id}>{p.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Return value
+
+|                   | Type                         | Description                                           |
+| ----------------- | ---------------------------- | ----------------------------------------------------- |
+| `data`            | `T \| null`                  | Resolved data                                         |
+| `loading`         | `boolean`                    | `true` while fetching                                 |
+| `error`           | `E \| null`                  | Error from last failed fetch                          |
+| `lastFetched`     | `number \| undefined`        | Timestamp of last successful fetch                    |
+| `reload`          | `(params?) => Promise<void>` | Force refetch                                         |
+| `refresh`         | `(params?) => Promise<void>` | Refetch if stale                                      |
+| `mutate`          | `(mutator) => void`          | Update data directly                                  |
+| `reset`           | `() => void`                 | Reset to initial state                                |
+| `setParams`       | `(params) => void`           | Update params and refetch _(if chunk accepts params)_ |
+| `pagination`      | `PaginationState`            | Current pagination state _(if paginated chunk)_       |
+| `nextPage`        | `() => Promise<void>`        | Load next page _(if paginated chunk)_                 |
+| `prevPage`        | `() => Promise<void>`        | Load previous page _(if paginated chunk)_             |
+| `goToPage`        | `(page) => Promise<void>`    | Jump to a page _(if paginated chunk)_                 |
+| `resetPagination` | `() => Promise<void>`        | Reset to page 1 _(if paginated chunk)_                |
+
+<Callout type="info">
+  `useAsyncChunk` automatically calls `cleanup()` when the component unmounts —
+  clearing any polling intervals or cache timers.
+</Callout>
+
+---
+
+## `useInfiniteAsyncChunk`
+
+Wraps `useAsyncChunk` for infinite scroll. Attach the returned `observerTarget` ref to a sentinel element at the bottom of your list and the hook handles the rest.
+
+```tsx
+import { infiniteAsyncChunk } from "stunk";
+import { useInfiniteAsyncChunk } from "stunk/react";
+
+const postsChunk = infiniteAsyncChunk(
+  async ({ page, pageSize }) => {
+    const res = await fetch(`/api/posts?page=${page}&limit=${pageSize}`);
+    const json = await res.json();
+    return { data: json.posts, hasMore: json.hasMore };
+  },
+  { pageSize: 20 },
+);
+
+function PostFeed() {
+  const {
+    data,
+    loading,
+    error,
+    hasMore,
+    isFetchingMore,
+    loadMore,
+    observerTarget,
+  } = useInfiniteAsyncChunk(postsChunk);
+
+  if (loading && !data?.length) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+
+  return (
+    <div>
+      <ul>
+        {data?.map((p) => (
+          <li key={p.id}>{p.title}</li>
+        ))}
+      </ul>
+      <div ref={observerTarget} />
+      {isFetchingMore && <p>Loading more...</p>}
+      {!hasMore && <p>You've reached the end.</p>}
+    </div>
+  );
+}
+```
+
+### Options
+
+| Option          | Type      | Default | Description                                      |
+| --------------- | --------- | ------- | ------------------------------------------------ |
+| `autoLoad`      | `boolean` | `true`  | Auto-load next page when sentinel is visible     |
+| `threshold`     | `number`  | `1.0`   | Intersection observer threshold                  |
+| `initialParams` | `object`  | —       | Initial params (excluding `page` and `pageSize`) |
+
+---
+
+## Deprecated in v2, removed in v3
+
+The following hooks exist in v2 but will be **removed in v3**. Stop using them now and migrate to the patterns below.
+
+### `useDerive` → use `useChunkValue`
+
+```tsx
+// ❌ v2 — deprecated
+const doubled = useDerive(count, (n) => n * 2);
+
+// ✅ v3 — derive outside, read with useChunkValue
+const doubled = count.derive((n) => n * 2);
+function Component() {
+  const value = useChunkValue(doubled);
+}
+```
+
+### `useComputed` → use `useChunkValue`
+
+```tsx
+// ❌ v2 — deprecated
+const total = useComputed([price, qty], (p, q) => p * q);
+
+// ✅ v3 — compute outside, read with useChunkValue
+const total = computed([price, qty], (p, q) => p * q);
+function Component() {
+  const value = useChunkValue(total);
+}
+```
+
+### `useChunkProperty` → use `useChunkValue` with a selector
+
+```tsx
+// ❌ v2 — deprecated
+const name = useChunkProperty(user, "name");
+
+// ✅ v3 — just use a selector
+const name = useChunkValue(user, (u) => u.name);
+```
+
+### `useChunkValues` → use `useChunkValue` per chunk
+
+```tsx
+// ❌ v2 — deprecated, subtle pitfalls with inline arrays
+const [price, qty] = useChunkValues([priceChunk, qtyChunk]);
+
+// ✅ v3 — explicit and clear
+const price = useChunkValue(priceChunk);
+const qty = useChunkValue(qtyChunk);
+```
+
+<Callout type="warn">
+  All four deprecated hooks will be **removed in v3** with no replacement other
+  than the patterns shown above. Migrating now will make your v3 upgrade a
+  non-event.
+</Callout>
+
+---
+
+## Summary
+
+| Hook                    | Use case                                    |
+| ----------------------- | ------------------------------------------- |
+| `useChunk`              | Read + write a chunk                        |
+| `useChunkValue`         | Read-only, also for derived/computed/select |
+| `useAsyncChunk`         | Async state with loading/error/data         |
+| `useInfiniteAsyncChunk` | Infinite scroll with auto-load              |
