@@ -1,0 +1,153 @@
+---
+title: Utilities
+description: Helper functions for working with chunks and async state.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+Stunk exports a set of utility functions for inspecting chunks, guarding against invalid values, and combining async state.
+
+```ts
+import {
+  isChunk,
+  isValidChunk,
+  isValidChunkValue,
+  once,
+  combineAsyncChunks,
+} from "stunk";
+```
+
+---
+
+## `isChunk(value)`
+
+Type guard that checks whether an unknown value is a valid `Chunk`. It verifies that the value is an object with all required chunk methods: `get`, `set`, `subscribe`, `derive`, `reset`, and `destroy`.
+
+```ts
+import { isChunk, chunk } from "stunk";
+
+const count = chunk(0);
+
+isChunk(count); // true
+isChunk(42); // false
+isChunk(null); // false
+isChunk({}); // false
+```
+
+Useful when building generic utilities or working with unknown values that may or may not be chunks:
+
+```ts
+function printValue(value: unknown) {
+  if (isChunk(value)) {
+    console.log("Chunk value:", value.get());
+  }
+}
+```
+
+---
+
+## `isValidChunk(value, validateBehavior?)`
+
+A stricter version of `isChunk`. In addition to checking the chunk interface, it can optionally validate that the chunk behaves correctly by calling `get()` and `set()` and verifying no errors are thrown.
+
+```ts
+import { isValidChunk, chunk } from "stunk";
+
+const count = chunk(0);
+
+isValidChunk(count); // true — shape check only
+isValidChunk(count, true); // true — also tests get/set behavior
+isValidChunk({ get: () => 0 }); // false — missing required methods
+```
+
+| Parameter          | Type      | Default | Description                                        |
+| ------------------ | --------- | ------- | -------------------------------------------------- |
+| `value`            | `unknown` | —       | Value to check                                     |
+| `validateBehavior` | `boolean` | `false` | If `true`, also tests `get()` and `set()` behavior |
+
+<Callout type="info">
+  Use `isChunk` for most cases. `isValidChunk` with `validateBehavior: true` is
+  useful when you need to verify that a chunk actually works — for example in
+  tests or when accepting chunks from external sources.
+</Callout>
+
+---
+
+## `isValidChunkValue(value)`
+
+Checks whether a value is valid as a chunk's initial value. Currently this just verifies the value is not `null`, since `null` is not allowed as a chunk value.
+
+```ts
+import { isValidChunkValue } from "stunk";
+
+isValidChunkValue(0); // true
+isValidChunkValue("hello"); // true
+isValidChunkValue(undefined); // true
+isValidChunkValue(null); // false
+```
+
+---
+
+## `once(fn)`
+
+Returns a wrapper function that calls `fn` only on the first invocation. Subsequent calls return the cached result without calling `fn` again.
+
+```ts
+import { once } from "stunk";
+
+const initialize = once(() => {
+  console.log("initialized!");
+  return 42;
+});
+
+initialize(); // logs "initialized!", returns 42
+initialize(); // returns 42, no log
+initialize(); // returns 42, no log
+```
+
+Useful for lazy initialization of chunks or expensive setup that should only run once:
+
+```ts
+const getStore = once(() => {
+  return chunk({ user: null, theme: "light" });
+});
+
+const store = getStore(); // chunk created
+const same = getStore(); // same chunk returned, not recreated
+```
+
+---
+
+## `combineAsyncChunks(chunks)`
+
+Merges multiple async chunks into a single reactive chunk with unified `loading`, `error`, `errors`, and `data` state. See the [Combine Async Chunks](/docs/async/combine-async-chunks) page for full documentation.
+
+```ts
+import { asyncChunk, combineAsyncChunks } from "stunk";
+
+const combined = combineAsyncChunks({
+  user: userChunk,
+  posts: postsChunk,
+});
+
+combined.get();
+// { loading: true, error: null, errors: {}, data: { user: null, posts: null } }
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Vanilla JS"
+    description="Use Stunk without any framework"
+    href="/docs/integrations/vanilla"
+  />
+  <Card
+    title="React Integration"
+    description="All React hooks for working with Stunk"
+    href="/docs/integrations/react"
+  />
+</Cards>
