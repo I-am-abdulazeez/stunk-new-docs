@@ -1,0 +1,190 @@
+---
+title: Migration Guide
+description: Step-by-step guide for migrating between Stunk major versions.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+---
+
+## v1 → v2
+
+v1 was an early, undocumented API used during initial development. v2 is the first production-ready release with a stable, fully documented API.
+
+<Callout type="warn">
+  v1 is no longer supported. Upgrade to v2 as soon as possible.
+</Callout>
+
+### `update()` removed — use `set()` with an updater
+
+v1 had separate `set()` and `update()` methods. v2 merges them — `set()` now accepts both a direct value and an updater function:
+
+```ts
+// v1
+count.set(10);
+count.update((n) => n + 1);
+
+// v2
+count.set(10);
+count.set((n) => n + 1); // updater function — update() is gone
+```
+
+**Action:** Replace every `count.update(fn)` call with `count.set(fn)`.
+
+---
+
+### New APIs in v2
+
+Everything below is new in v2 — none of it existed in v1:
+
+| API                    | Package            | Description                                     |
+| ---------------------- | ------------------ | ----------------------------------------------- |
+| `computed()`           | `stunk`            | Derive from multiple chunks with dirty tracking |
+| `select()`             | `stunk`            | Read-only derived chunk with shallow equality   |
+| `asyncChunk()`         | `stunk`            | Async state with loading/error/data             |
+| `infiniteAsyncChunk()` | `stunk`            | Paginated async state                           |
+| `batch()`              | `stunk`            | Batch multiple updates into one render          |
+| `logger`               | `stunk/middleware` | Console logging middleware                      |
+| `withHistory()`        | `stunk/middleware` | Undo/redo time travel                           |
+| `withPersistence()`    | `stunk/middleware` | localStorage persistence                        |
+| `nonNegativeValidator` | `stunk/middleware` | Value validation middleware                     |
+| `stunk/react`          | `stunk/react`      | All React hooks                                 |
+
+---
+
+## v2 → v3
+
+v3 is not yet released, but these are the confirmed breaking changes and deprecations. **You can start migrating now** — all v3 patterns work in v2 today.
+
+<Callout type="info">
+  The v2 API will remain supported during the v3 transition. Migration is opt-in
+  and can be done incrementally.
+</Callout>
+
+---
+
+### `computed()` — dependency arrays removed
+
+v3 introduces automatic dependency tracking. You no longer pass a dependency array:
+
+```ts
+// v2
+const total = computed([price, quantity], (p, q) => p * q);
+
+// v3
+const total = computed(() => price.get() * quantity.get());
+```
+
+Dependencies are detected automatically by intercepting `.get()` calls during execution — similar to how SolidJS and MobX work.
+
+**Action:** When v3 ships, replace `computed([deps], fn)` with `computed(() => fn)` using `.get()` calls inside.
+
+---
+
+### `useDerive` removed — derive outside, use `useChunkValue`
+
+`useDerive` added unnecessary indirection. Derive outside the component and pass to `useChunkValue`:
+
+```tsx
+// v2 — deprecated
+function Component() {
+  const doubled = useDerive(count, (n) => n * 2);
+}
+
+// v3 — derive once, outside the component
+const doubled = count.derive((n) => n * 2);
+
+function Component() {
+  const value = useChunkValue(doubled);
+}
+```
+
+**Action:** Move all `.derive()` calls outside your components. Replace `useDerive` with `useChunkValue`.
+
+---
+
+### `useComputed` removed — compute outside, use `useChunkValue`
+
+Same pattern as `useDerive`:
+
+```tsx
+// v2 — deprecated
+function Component() {
+  const total = useComputed([price, qty], (p, q) => p * q);
+}
+
+// v3 — compute once, outside the component
+const total = computed([price, qty], (p, q) => p * q);
+
+function Component() {
+  const value = useChunkValue(total);
+}
+```
+
+**Action:** Move all `computed()` calls outside your components. Replace `useComputed` with `useChunkValue`.
+
+---
+
+### `useChunkProperty` removed — use `useChunkValue` with a selector
+
+`useChunkProperty` was a thin wrapper with no real benefit:
+
+```tsx
+// v2 — deprecated
+const name = useChunkProperty(user, "name");
+
+// v3
+const name = useChunkValue(user, (u) => u.name);
+```
+
+**Action:** Replace every `useChunkProperty(chunk, key)` with `useChunkValue(chunk, s => s[key])`.
+
+---
+
+### `useChunkValues` removed — use `useChunkValue` per chunk
+
+`useChunkValues` had a subtle re-render bug when the chunks array was defined inline. The explicit pattern is clearer and safer:
+
+```tsx
+// v2 — deprecated, pitfalls with inline arrays
+const [price, qty] = useChunkValues([priceChunk, qtyChunk]);
+
+// v3 — explicit, no surprises
+const price = useChunkValue(priceChunk);
+const qty = useChunkValue(qtyChunk);
+```
+
+**Action:** Replace every `useChunkValues` call with individual `useChunkValue` calls.
+
+---
+
+### v3 React API — the full picture
+
+After migration, your React imports slim down to just four hooks:
+
+```ts
+import {
+  useChunk, // read + write
+  useChunkValue, // read-only (derived, computed, select, plain)
+  useAsyncChunk, // async state
+  useInfiniteAsyncChunk, // infinite scroll
+} from "stunk/react";
+```
+
+---
+
+## Migration checklist
+
+### v1 → v2
+
+- [ ] Replace `chunk.update(fn)` with `chunk.set(fn)`
+- [ ] Install latest `stunk` package
+
+### v2 → v3
+
+- [ ] Move `.derive()` calls outside components, replace `useDerive` with `useChunkValue`
+- [ ] Move `computed()` calls outside components, replace `useComputed` with `useChunkValue`
+- [ ] Replace `useChunkProperty(chunk, key)` with `useChunkValue(chunk, s => s[key])`
+- [ ] Replace `useChunkValues([...])` with individual `useChunkValue` calls
+- [ ] When v3 ships: migrate `computed([deps], fn)` to `computed(() => fn)`
