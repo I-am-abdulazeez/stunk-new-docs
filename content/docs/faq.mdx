@@ -1,0 +1,291 @@
+---
+title: FAQ
+description: Frequently asked questions about Stunk.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+---
+
+## General
+
+### How is Stunk different from Zustand?
+
+Zustand uses a single store object — you define all your state in one place and select slices from it. Stunk uses atomic chunks — each piece of state lives independently and can be composed together.
+
+```ts
+// Zustand — one store
+const useStore = create(() => ({ count: 0, name: "Fola" }));
+const count = useStore((s) => s.count);
+
+// Stunk — independent chunks
+const count = chunk(0);
+const name = chunk("Fola");
+```
+
+In Stunk, chunks don't know about each other by default. You compose them explicitly with `computed()`, `batch()`, or `combineAsyncChunks()`. This makes state easier to split across files, test in isolation, and reason about independently.
+
+---
+
+### How is Stunk different from Jotai?
+
+Jotai is also atom-based and the closest conceptually to Stunk. The key differences:
+
+- **Stunk works outside React** — chunks are plain JS objects, not React atoms. You can use them in Node, workers, or any framework.
+- **Stunk doesn't require a Provider** — no `<Provider>` wrapping your app.
+- **Stunk has built-in async, history, and persistence** — Jotai handles these through separate packages (`jotai/utils`). Stunk ships them in the box.
+- **Stunk's API is smaller** — four React hooks cover everything in v3. Jotai has many atom types and utility atoms.
+
+---
+
+### How is Stunk different from Redux?
+
+Redux requires actions, reducers, and a store setup before you can manage a single value. Stunk doesn't:
+
+```ts
+// Stunk — just works
+const count = chunk(0);
+count.set((n) => n + 1);
+```
+
+Redux is powerful for large teams and complex update logic. Stunk is for developers who want reactivity without the ceremony.
+
+---
+
+### Does Stunk work with TypeScript?
+
+Yes — fully. Types are inferred automatically from the initial value. You never need to annotate chunk types manually unless you want to:
+
+```ts
+const count = chunk(0); // Chunk<number>
+const status = chunk<"idle" | "loading" | "error">("idle"); // explicit
+```
+
+---
+
+### Can I use Stunk server-side?
+
+The core `stunk` package — `chunk`, `computed`, `select`, `batch`, `asyncChunk` — has no browser dependencies and works in any JS environment including Node.js, Deno, Cloudflare Workers, and server-side rendering.
+
+The exception is `withPersistence`, which defaults to `localStorage`. In SSR or server environments, either skip it or guard the call:
+
+```ts
+if (typeof window !== "undefined") {
+  withPersistence(theme, { key: "app-theme" });
+}
+```
+
+React hooks (`stunk/react`) are browser/React-only, as expected.
+
+---
+
+### Is Stunk production ready?
+
+Yes. v2.8.1 is a stable release — 3.32kB gzipped, zero dependencies, and actively used in production apps.
+
+---
+
+## Core Concepts
+
+### When should I use `select()` vs `.derive()`?
+
+Use `.derive()` for simple value transformations:
+
+```ts
+const price = chunk(100);
+const discounted = price.derive((p) => p * 0.9);
+```
+
+Use `select()` when you're slicing a property off an object chunk and want to avoid unnecessary updates — especially in React:
+
+```ts
+const user = chunk({ name: "Fola", age: 25, role: "admin" });
+const userName = select(user, (u) => u.name, { useShallowEqual: true });
+// only updates when name changes, not age or role
+```
+
+The key difference is `useShallowEqual` — `select()` supports it, `.derive()` doesn't.
+
+---
+
+### When should I use `computed()` vs `.derive()`?
+
+Use `.derive()` when your derived value depends on **one** chunk. Use `computed()` when it depends on **multiple** chunks:
+
+```ts
+// One source — use derive
+const doubled = count.derive((n) => n * 2);
+
+// Multiple sources — use computed
+const total = computed([price, quantity], (p, q) => p * q);
+```
+
+---
+
+### Can I write to a derived chunk or selector?
+
+No — derived chunks and selectors are read-only by design. To change the value, update the source chunk:
+
+```ts
+const userName = select(user, (u) => u.name);
+
+userName.set("Tunde"); // ❌ throws
+
+user.set((prev) => ({ ...prev, name: "Tunde" })); // ✅
+```
+
+---
+
+### What happens if I pass `null` as an initial value?
+
+Stunk throws immediately. `null` is not a valid chunk value:
+
+```ts
+chunk(null); // ❌ Error: "Initial value cannot be null."
+```
+
+Use `undefined` or a typed default instead:
+
+```ts
+chunk<string | undefined>(undefined); // ✅
+chunk({ name: null }); // ✅ — null inside an object is fine
+```
+
+---
+
+### Does `subscribe` fire immediately?
+
+Yes — always. The callback is called once immediately with the current value when you subscribe, then on every subsequent change:
+
+```ts
+const count = chunk(5);
+
+count.subscribe((value) => console.log(value));
+// immediately logs: 5
+
+count.set(10); // logs: 10
+```
+
+---
+
+## React
+
+### Do I need a Provider?
+
+No. Chunks are defined outside components and accessed directly — no context, no Provider, no wrapping:
+
+```tsx
+const count = chunk(0); // global, outside React
+
+function Counter() {
+  const [value] = useChunk(count); // just works
+}
+```
+
+---
+
+### Which hook should I use?
+
+| Situation                                       | Hook                    |
+| ----------------------------------------------- | ----------------------- |
+| Read + write a chunk                            | `useChunk`              |
+| Read-only (including derived, computed, select) | `useChunkValue`         |
+| Async state                                     | `useAsyncChunk`         |
+| Infinite scroll                                 | `useInfiniteAsyncChunk` |
+
+---
+
+### Will my component re-render on every chunk update?
+
+Only when the value it subscribes to actually changes. If you use a selector, the component only re-renders when the selected slice changes:
+
+```tsx
+// Re-renders only when user.name changes — not age or role
+const [name] = useChunk(user, (u) => u.name);
+```
+
+---
+
+### Can I share chunks across components?
+
+Yes — that's the whole point. Define chunks outside your components at module scope and import them anywhere:
+
+```ts
+// store/counter.ts
+export const counter = chunk(0);
+
+// ComponentA.tsx
+const [count] = useChunk(counter);
+
+// ComponentB.tsx
+const [count, setCount] = useChunk(counter);
+```
+
+Both components subscribe to the same chunk and stay in sync automatically.
+
+---
+
+## Async
+
+### Does `asyncChunk` refetch on every mount?
+
+No — it fetches once on creation unless you configure `refetchInterval` or call `reload()` manually. If you want to refetch when a component mounts, call `reload()` in a `useEffect`:
+
+```ts
+useEffect(() => {
+  postsChunk.reload();
+}, []);
+```
+
+---
+
+### What's the difference between `reload()` and `refresh()`?
+
+- `reload()` — always fetches, ignores stale time
+- `refresh()` — fetches only if data is stale (respects `staleTime`)
+
+```ts
+await postsChunk.reload(); // always refetches
+await postsChunk.refresh(); // skips if data is still fresh
+```
+
+---
+
+## Middleware
+
+### Can I use multiple middleware on one chunk?
+
+Yes — pass them as an array. They run left to right, each receiving the output of the previous:
+
+```ts
+const count = chunk(0, [logger, nonNegativeValidator]);
+```
+
+---
+
+### Can middleware stop an update?
+
+Yes — return `undefined` from a middleware function to cancel the update entirely:
+
+```ts
+const noZero: Middleware<number> = (value) => {
+  if (value === 0) return undefined; // update skipped
+  return value;
+};
+```
+
+---
+
+### Does `withHistory` work with object chunks?
+
+Yes — it records every `set()` call regardless of the value type:
+
+```ts
+const user = chunk({ name: "Fola", age: 25 });
+const userWithHistory = withHistory(user);
+
+userWithHistory.set({ name: "Tunde", age: 30 });
+userWithHistory.undo();
+userWithHistory.get(); // { name: "Fola", age: 25 }
+```
