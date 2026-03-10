@@ -1,0 +1,246 @@
+---
+title: Vanilla / TypeScript
+description: Use Stunk without any framework — pure reactive state in plain JavaScript or TypeScript.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+Stunk has zero dependencies and no framework requirements. Everything works in plain JavaScript or TypeScript — `chunk`, `computed`, `select`, `batch`, `asyncChunk`, and all middleware.
+
+---
+
+## Basic state
+
+```ts
+import { chunk } from "stunk";
+
+const count = chunk(0);
+
+// Read
+count.get(); // 0
+
+// Write
+count.set(1);
+count.set((prev) => prev + 1);
+
+// Reset
+count.reset();
+```
+
+---
+
+## Subscribing to changes
+
+`subscribe` is the core reactivity primitive. The callback fires immediately with the current value, then on every subsequent change. It returns an unsubscribe function.
+
+```ts
+const count = chunk(0);
+
+const unsubscribe = count.subscribe((value) => {
+  document.querySelector("#count").textContent = String(value);
+});
+
+count.set(1); // DOM updates
+count.set(2); // DOM updates
+
+// Stop listening
+unsubscribe();
+```
+
+---
+
+## Deriving state
+
+```ts
+import { chunk } from "stunk";
+
+const price = chunk(100);
+const discounted = price.derive((p) => p * 0.9);
+
+discounted.subscribe((value) => {
+  document.querySelector("#price").textContent = `$${value}`;
+});
+
+price.set(200); // discounted updates to 180, DOM updates
+```
+
+---
+
+## Selecting from objects
+
+```ts
+import { chunk, select } from "stunk";
+
+const user = chunk({ name: "Fola", age: 25, role: "admin" });
+
+const userName = select(user, (u) => u.name);
+
+userName.subscribe((name) => {
+  document.querySelector("#name").textContent = name;
+});
+
+// Only triggers when name changes, not age or role
+user.set((prev) => ({ ...prev, age: 26 })); // no DOM update
+user.set((prev) => ({ ...prev, name: "Tunde" })); // DOM updates
+```
+
+---
+
+## Computed from multiple chunks
+
+```ts
+import { chunk, computed } from "stunk";
+
+const price = chunk(100);
+const quantity = chunk(3);
+const total = computed([price, quantity], (p, q) => p * q);
+
+total.subscribe((value) => {
+  document.querySelector("#total").textContent = `$${value}`;
+});
+
+price.set(50); // total → 150
+quantity.set(10); // total → 500
+```
+
+---
+
+## Batch updates
+
+Group multiple updates to avoid redundant subscriber notifications:
+
+```ts
+import { chunk, batch } from "stunk";
+
+const firstName = chunk("Fola");
+const lastName = chunk("Ade");
+
+// Without batch — two notifications
+firstName.set("Tunde");
+lastName.set("Bello");
+
+// With batch — one notification after both updates
+batch(() => {
+  firstName.set("Tunde");
+  lastName.set("Bello");
+});
+```
+
+---
+
+## Async state
+
+```ts
+import { asyncChunk } from "stunk";
+
+const postsChunk = asyncChunk(async () => {
+  const res = await fetch("/api/posts");
+  return res.json();
+});
+
+postsChunk.subscribe(({ loading, error, data }) => {
+  if (loading) {
+    document.querySelector("#posts").textContent = "Loading...";
+    return;
+  }
+  if (error) {
+    document.querySelector("#posts").textContent = `Error: ${error.message}`;
+    return;
+  }
+  document.querySelector("#posts").innerHTML = data
+    .map((p) => `<li>${p.title}</li>`)
+    .join("");
+});
+
+// Refetch manually
+document.querySelector("#reload").addEventListener("click", () => {
+  postsChunk.reload();
+});
+```
+
+---
+
+## Middleware
+
+```ts
+import { chunk } from "stunk";
+import { logger, nonNegativeValidator } from "stunk/middleware";
+
+const score = chunk(0, [logger, nonNegativeValidator]);
+
+score.set(10); // logs and applies
+score.set(-1); // throws, value unchanged
+```
+
+---
+
+## withHistory
+
+```ts
+import { chunk } from "stunk";
+import { withHistory } from "stunk/middleware";
+
+const text = chunk("");
+const editor = withHistory(text);
+
+editor.set("Hello");
+editor.set("Hello World");
+
+editor.undo(); // "Hello"
+editor.redo(); // "Hello World"
+```
+
+---
+
+## withPersistence
+
+```ts
+import { chunk } from "stunk";
+import { withPersistence } from "stunk/middleware";
+
+const theme = chunk<"light" | "dark">("light");
+const persistedTheme = withPersistence(theme, { key: "app-theme" });
+
+persistedTheme.set("dark");
+// saved to localStorage
+
+// Next page load — automatically restored to "dark"
+```
+
+---
+
+## Cleanup
+
+Always call `destroy()` when a chunk is no longer needed to clear subscribers and free memory:
+
+```ts
+const count = chunk(0);
+const sub = count.subscribe(console.log);
+
+// When done
+count.destroy(); // clears all subscribers and removes from registry
+```
+
+<Callout type="info">
+  In single-page apps, long-lived global chunks rarely need to be destroyed.
+  `destroy()` is most useful for short-lived chunks created dynamically — like
+  per-item state in a list.
+</Callout>
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="React Integration"
+    description="Official React hooks for Stunk"
+    href="/docs/integrations/react"
+  />
+  <Card
+    title="Utilities"
+    description="Helper functions for inspecting and combining chunks"
+    href="/docs/utilities/utilities"
+  />
+</Cards>
