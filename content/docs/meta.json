@@ -6,6 +6,7 @@
     "core-concepts",
     "async",
     "middleware",
-    "integrations"
+    "integrations",
+    "utilities"
   ]
 }
