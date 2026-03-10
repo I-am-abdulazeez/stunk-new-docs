@@ -7,6 +7,7 @@
     "async",
     "middleware",
     "integrations",
-    "utilities"
+    "utilities",
+    "faq"
   ]
 }
