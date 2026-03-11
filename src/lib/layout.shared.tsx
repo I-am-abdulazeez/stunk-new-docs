@@ -2,7 +2,7 @@ import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 import type { DocsLayoutProps } from "fumadocs-ui/layouts/docs";
 import { BookOpen } from "lucide-react";
 
-import stunkLogo from "@/assets/stunk-logo.png";
+import stunkLogo from "@/assets/logo.svg";
 import { RiGithubLine } from "react-icons/ri";
 
 export function baseOptions(): BaseLayoutProps {
@@ -10,7 +10,7 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <span className="flex items-center gap-2 font-bold text-base tracking-tight">
-          <img src={stunkLogo} alt="Stunk" className="w-6 h-6" />
+          <img src={stunkLogo} alt="Stunk" className="w-4 h-4" />
           Stunk
         </span>
       ),
