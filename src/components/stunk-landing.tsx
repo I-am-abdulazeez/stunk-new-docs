@@ -29,7 +29,7 @@ import InstallCommand from "./landings/commands";
 import TypewriterCode from "./landings/typewriter";
 import AnimatedStateFlow from "./landings/state-flow";
 
-import stunkLogo from "@/assets/stunk-logo.png";
+import stunkLogo from "@/assets/logo.svg";
 
 const FEATURES = [
   {
@@ -97,7 +97,7 @@ export default function StunkLanding() {
             <img
               src={stunkLogo}
               alt="Stunk"
-              className="w-6 h-6 object-contain"
+              className="w-4 h-4 object-contain"
             />
             Stunk
           </span>
