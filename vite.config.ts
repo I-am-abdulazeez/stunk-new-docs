@@ -19,6 +19,11 @@ export default defineConfig({
     tanstackStart({
       prerender: {
         enabled: true,
+        crawlLinks: true,
+      },
+      sitemap: {
+        enabled: true,
+        host: 'https://stunk.dev',
       },
     }),
     react(),
