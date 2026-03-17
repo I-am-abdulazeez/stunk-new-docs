@@ -18,6 +18,7 @@ const count = chunk(0);
 count.get(); // 0
 count.set(1); // set directly
 count.set((n) => n + 1); // or derive from previous
+count.peek(); // read without tracking dependencies
 count.reset(); // back to 0
 ```
 
@@ -37,16 +38,22 @@ import { chunk, computed } from "stunk";
 const price = chunk(100);
 const quantity = chunk(3);
 
-// Derived from a single chunk
+// Derived from a single chunk — read-only
 const discounted = price.derive((p) => p * 0.9);
 
-// Computed from multiple chunks
-const total = computed([price, quantity], (p, q) => p * q);
+// Computed from multiple chunks — auto-tracks dependencies via .get()
+const total = computed(() => price.get() * quantity.get());
 
 total.get(); // 300 — updates automatically when price or quantity changes
 ```
 
 Think of chunks as the atoms of your application state. Small, focused, and composable.
+
+<Callout type="info">
+  `computed()` in v3 automatically discovers its dependencies by tracking which
+  chunks call `.get()` during execution — no dependency arrays needed. Use
+  `.peek()` inside a computed function to read a value without tracking it.
+</Callout>
 
 ## Key Features
 
@@ -63,12 +70,12 @@ Think of chunks as the atoms of your application state. Small, focused, and comp
   />
   <Card
     title="Derive & Computed"
-    description="Derive state from one chunk or compose across multiple with full reactivity."
+    description="Derive state from one chunk or compose across multiple with auto dependency tracking."
     href="/docs/core-concepts/derive"
   />
   <Card
-    title="Async Support"
-    description="Built-in loading, error, and data states for async operations."
+    title="Async & Query"
+    description="Built-in loading, error, caching, deduplication, and pagination via stunk/query."
     href="/docs/async/async-chunk"
   />
   <Card
@@ -106,6 +113,25 @@ function Counter() {
 ```
 
 The component re-renders only when `counter` changes — nothing else.
+
+## Async in 30 seconds
+
+The `stunk/query` subpackage brings a full async state layer — loading states,
+error handling, caching, request deduplication, and pagination — with no extra dependencies:
+
+```ts
+import { asyncChunk } from "stunk/query";
+
+const userChunk = asyncChunk(async ({ id }: { id: number }) => fetchUser(id), {
+  key: "user", // deduplicates concurrent requests
+  keepPreviousData: true, // no UI flicker on param changes
+  onSuccess: (data) => console.log("Loaded", data),
+});
+
+userChunk.setParams({ id: 1 });
+// { loading: true, data: null, error: null }
+// { loading: false, data: { id: 1, name: "..." }, error: null }
+```
 
 ## Installation
 
