@@ -13,123 +13,137 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ---
 
-## v2.8.1 — Current
+## v3.0.0 — alpha.2 (Current)
 
-**Stable release.** Bundle size: **3.32kB gzipped**.
+**Alpha release.** Bundle size: **3.32kB gzipped** (core + React + Query).
+
+<Callout type="warn">
+  v3 is in active development. APIs are stable but may change before the final
+  release. For production use, see [v2.8.1](#v281--stable).
+</Callout>
+
+### What's new in v3
+
+**Core (`stunk`)**
+
+- `peek()` — read a chunk value without registering it as a tracked dependency
+- `strict` mode on `ChunkConfig` — throws or warns on unknown keys in `set()` in development
+- `null` is now a valid chunk value (`undefined` still forbidden)
+- `ReadOnlyChunk<T>` — `derive()` now returns a proper read-only type at the TypeScript level
+- `trackDependencies` exported — for building custom reactive primitives
+- `validateObjectShape` improved — no longer warns on `undefined → T` or `T → null` transitions
+
+**Computed (redesigned)**
+
+- Auto-tracks dependencies via `.get()` calls — no dependency arrays needed
+- Lazy evaluation with eager recompute when subscribers are active
+- `isDirty()` and `recompute()` for manual control
+- `peek()` inside `computed()` reads without tracking
+- Diamond dependency pattern handled correctly — subscribers notified once
+
+```ts
+// v2
+const total = computed([price, quantity], (p, q) => p * q);
+
+// v3
+const total = computed(() => price.get() * quantity.get());
+```
+
+**Query — new subpath `stunk/query`**
+
+- `asyncChunk` — reactive async state with loading, error, data, lastFetched
+- `infiniteAsyncChunk` — accumulate-mode pagination for infinite scroll
+- `combineAsyncChunks` — unified loading/error/data across multiple async chunks
+- `key` option — request deduplication, concurrent calls share one in-flight request
+- `keepPreviousData` + `isPlaceholderData` — no UI flicker on param changes
+- `onSuccess` / `onError` callbacks
+- `enabled` as boolean or `() => boolean` — dynamic disabling
+- `setParams` with `null` clearing individual keys, `clearParams()` to wipe all
+- `refetchOnWindowFocus`, `refetchInterval`, `staleTime`, `cacheTime`
+- `forceCleanup()` + ref-counted `cleanup()`
+- Full pagination — `nextPage`, `prevPage`, `goToPage`, `resetPagination`
+- SSR-safe — all `window` access guarded
+
+**Middleware (`stunk/middleware`)**
+
+- `history` (renamed from `withHistory`) — `reset()` now clears the history stack
+- `skipDuplicates: true` — strict equality only; `'shallow'` — shallow equality for objects
+- `persist` (renamed from `withPersistence`) — `clearStorage()` added, `onError` called on type mismatches, array vs object type mismatch detection
+
+**React (`stunk/react`)**
+
+- `useAsyncChunk` — rewritten: single effect, Rules of Hooks compliant, exposes `isPlaceholderData` and `clearParams`
+- `useInfiniteAsyncChunk` — stable `IntersectionObserver`, SSR-safe, correct `isFetchingMore`
+- `useDerive`, `useComputed`, `useChunkProperty`, `useChunkValues` — removed (use `useChunkValue(computed(...))` instead)
+
+### Breaking changes from v2
+
+| Change                         | v2                           | v3                   |
+| ------------------------------ | ---------------------------- | -------------------- |
+| `computed()` API               | `computed([deps], fn)`       | `computed(() => fn)` |
+| `withHistory`                  | `import { withHistory }`     | `import { history }` |
+| `withPersistence`              | `import { withPersistence }` | `import { persist }` |
+| `asyncChunk` import            | `stunk`                      | `stunk/query`        |
+| `useDerive` / `useComputed`    | available                    | removed              |
+| `subscribe` fires on subscribe | yes                          | no — only on change  |
+| `null` as chunk value          | forbidden                    | allowed              |
+
+---
+
+## v2.8.1 — Stable
+
+**Latest stable release.** Bundle size: **2.95kB gzipped** (core + React).
 
 ### What's in v2
-
-v2 is the first production-ready, fully-documented release of Stunk. If you're starting fresh, this is where you begin.
 
 **Core (`stunk`)**
 
 - `chunk()` — atomic state primitive with `get()`, `set()`, `reset()`, `destroy()`, `subscribe()`, `derive()`
-- `computed()` — derive state from multiple chunks with automatic recomputation and `isDirty()` tracking
-- `select()` — create a read-only derived chunk from a single source with optional shallow equality comparison (`useShallowEqual`)
+- `computed()` — derive state from multiple chunks with dependency arrays and `isDirty()` tracking
+- `select()` — read-only derived chunk with optional shallow equality (`useShallowEqual`)
 - `asyncChunk()` — async state with built-in `loading`, `error`, `data`, and `reload`
-- `infiniteAsyncChunk()` — paginated / infinite-scroll async state management
+- `infiniteAsyncChunk()` — paginated / infinite-scroll async state
 - `batch()` — group multiple state updates into a single render cycle
 
 **Middleware (`stunk/middleware`)**
 
-- `logger` — logs every `set()` call to the console
-- `withHistory()` — wraps a chunk with full undo/redo history (`undo`, `redo`, `canUndo`, `canRedo`, `getHistory`, `clearHistory`, configurable `maxHistory`)
-- `withPersistence()` — persists chunk state to `localStorage` (or any `Storage` implementation) with custom `serialize`/`deserialize` support
-- `nonNegativeValidator` — middleware that throws if a numeric value goes below zero
+- `logger` — logs every `set()` call
+- `withHistory()` — undo/redo history (`undo`, `redo`, `canUndo`, `canRedo`, `getHistory`, `clearHistory`, `maxHistory`)
+- `withPersistence()` — localStorage persistence with custom `serialize`/`deserialize`
+- `nonNegativeValidator` — throws if a numeric value goes below zero
 
 **React (`stunk/react`)**
 
 - `useChunk` — read and write a chunk reactively
-- `useChunkValue` — read-only subscription to a chunk
-- `useDerive` — derive a value from a single chunk in a component
-- `useComputed` — compute a value from multiple chunks in a component
-- `useAsyncChunk` — manage async state with loading/error/data in React
-- `useInfiniteAsyncChunk` — infinite scroll / pagination hook
+- `useChunkValue` — read-only subscription
+- `useDerive` — derive a value from a single chunk
+- `useComputed` — compute a value from multiple chunks
+- `useAsyncChunk` — async state hook
+- `useInfiniteAsyncChunk` — infinite scroll hook
 
 ---
 
 ## v1 → v2 Migration
 
-v1 was an early, undocumented API used during initial development. If you used it, here's what changed:
-
 ### `set()` and `update()` merged
 
-**v1**
-
 ```ts
-count.set(10); // set a direct value
-count.update((n) => n + 1); // update from previous value
+// v1
+count.set(10);
+count.update((n) => n + 1);
+
+// v2+
+count.set(10);
+count.set((n) => n + 1); // update() removed
 ```
-
-**v2**
-
-```ts
-count.set(10); // set a direct value
-count.set((n) => n + 1); // updater function — update() is gone
-```
-
-`set()` now accepts both a value and an updater function. `update()` has been removed.
-
-### New APIs in v2
-
-These did not exist in v1 — they are all new:
-
-| API                    | Package            | Description                                           |
-| ---------------------- | ------------------ | ----------------------------------------------------- |
-| `computed()`           | `stunk`            | Derive from multiple chunks with dirty tracking       |
-| `select()`             | `stunk`            | Read-only derived chunk with shallow equality support |
-| `asyncChunk()`         | `stunk`            | Async state with loading/error/data                   |
-| `infiniteAsyncChunk()` | `stunk`            | Paginated async state                                 |
-| `batch()`              | `stunk`            | Batch multiple updates into one render                |
-| `logger`               | `stunk/middleware` | Console logging middleware                            |
-| `withHistory()`        | `stunk/middleware` | Undo/redo time travel                                 |
-| `withPersistence()`    | `stunk/middleware` | localStorage persistence                              |
-| `nonNegativeValidator` | `stunk/middleware` | Value validation middleware                           |
-| `stunk/react`          | `stunk/react`      | All React hooks                                       |
-
----
-
-## Coming in v3
-
-These are planned or in active development:
-
-### Computed redesign
-
-The `computed()` API will be redesigned to automatically track dependencies — no more dependency arrays:
-
-```ts
-// Current v2
-const total = computed([price, quantity], (p, q) => p * q);
-
-// Planned v3
-const total = computed(() => price.get() * quantity.get());
-```
-
-Dependencies are detected automatically by intercepting `.get()` calls during execution — similar to how SolidJS and MobX work.
-
-<Callout type="warn">
-  The v2 `computed()` API will remain supported during the v3 transition.
-  Migration will be opt-in.
-</Callout>
-
-### Vue composables
-
-Full Vue 3 Composition API support via `stunk/vue`:
-
-```ts
-import { useChunk } from "stunk/vue";
-```
-
-### Svelte integration
-
-Native Svelte stores integration via `stunk/svelte` — planned after Vue completion.
 
 ---
 
 ## Release History
 
-| Version | Status        | Highlights                                             |
-| ------- | ------------- | ------------------------------------------------------ |
-| `2.8.1` | ✅ Stable     | Current release, 3.32kB gzipped                        |
-| `2.x`   | ✅ Stable     | Full React integration, async, middleware, time travel |
-| `1.x`   | ⚠️ Deprecated | Early API, no longer supported                         |
+| Version       | Status        | Highlights                                               |
+| ------------- | ------------- | -------------------------------------------------------- |
+| `3.0.0-alpha` | 🚧 Alpha      | Computed redesign, stunk/query, strict mode, null values |
+| `2.8.1`       | ✅ Stable     | Latest stable, 2.95kB gzipped                            |
+| `2.x`         | ✅ Stable     | Full React integration, async, middleware, time travel   |
+| `1.x`         | ⚠️ Deprecated | Early API, no longer supported                           |
