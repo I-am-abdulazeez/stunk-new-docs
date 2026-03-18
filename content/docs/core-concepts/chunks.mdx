@@ -7,7 +7,7 @@ icon: Box
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-A **chunk** is the fundamental building block of Stunk. It's a small, self-contained reactive container that holds a single value of any type — a number, string, object, array, or anything else.
+A **chunk** is the fundamental building block of Stunk. It's a small, self-contained reactive container that holds a single value of any type — a number, string, object, array, or `null`.
 
 ```ts
 import { chunk } from "stunk";
@@ -16,13 +16,14 @@ const count = chunk(0);
 const name = chunk("Fola");
 const user = chunk({ name: "Fola", age: 25 });
 const items = chunk<string[]>([]);
+const empty = chunk<string | null>(null); // null is valid in v3
 ```
 
 Chunks are defined **outside** components and functions. They are global reactive state — not component-local.
 
 <Callout type="warn">
-  `null` is not a valid initial value. Passing `null` to `chunk()` will throw an
-  error. Use `undefined` or a typed default instead.
+  `undefined` is not a valid initial value. Passing `undefined` to `chunk()`
+  will throw an error. Use `null` or a typed default instead.
 </Callout>
 
 ---
@@ -31,12 +32,25 @@ Chunks are defined **outside** components and functions. They are global reactiv
 
 ### `get()`
 
-Returns the current value of the chunk.
+Returns the current value and registers the chunk as a tracked dependency inside `computed()`.
 
 ```ts
 const count = chunk(0);
-
 count.get(); // 0
+```
+
+---
+
+### `peek()`
+
+Returns the current value **without** registering it as a dependency. Use this inside `computed()` when you need a value but don't want changes to it triggering a recompute.
+
+```ts
+const count = chunk(0);
+const multiplier = chunk(2);
+
+const result = computed(() => count.get() * multiplier.peek());
+// result only recomputes when count changes — not when multiplier changes
 ```
 
 ---
@@ -48,13 +62,9 @@ Sets a new value. Accepts either a direct value or an updater function that rece
 ```ts
 const count = chunk(0);
 
-// Direct value
-count.set(10);
+count.set(10); // direct value
+count.set((prev) => prev + 1); // updater function
 
-// Updater function
-count.set((prev) => prev + 1);
-
-// Works with objects too
 const user = chunk({ name: "Fola", age: 25 });
 user.set((prev) => ({ ...prev, age: 26 }));
 ```
@@ -64,9 +74,9 @@ user.set((prev) => ({ ...prev, age: 26 }));
   current value. Setting the same value twice won't trigger a re-render.
 </Callout>
 
-**Object shape validation**
+**Object shape validation (dev only)**
 
-When setting an object value, Stunk validates that the new value has the same shape as the existing one — same keys, same structure. This prevents accidental shape mutations at runtime.
+In development, Stunk validates that the new value matches the shape of the initial value — same keys, same types. This catches accidental shape mutations early.
 
 ```ts
 const user = chunk({ name: "Fola", age: 25 });
@@ -74,33 +84,47 @@ const user = chunk({ name: "Fola", age: 25 });
 // ✅ Same shape — works
 user.set({ name: "Tunde", age: 30 });
 
-// ❌ Different shape — throws at runtime
-user.set({ name: "Tunde" });
+// ⚠️ Unknown key — warns in dev
+user.set({ name: "Tunde", age: 30, role: "admin" } as any);
+```
+
+For a harder enforcement that **throws** instead of warning, use `strict` mode:
+
+```ts
+const user = chunk({ name: "Fola", age: 25 }, { strict: true });
+
+// 🚨 Throws in development
+user.set({ name: "Tunde", age: 30, role: "admin" } as any);
+// Error: [chunk_0] Unexpected keys in set(): role.
 ```
 
 ---
 
 ### `subscribe(callback)`
 
-Subscribes to value changes. The callback is called **immediately** with the current value, then on every subsequent change.
+Subscribes to value changes. The callback is called **only on changes** — not immediately on subscribe.
 
-Returns an **unsubscribe function** — call it to stop listening.
+Returns an **unsubscribe function**.
 
 ```ts
 const count = chunk(0);
 
 const unsubscribe = count.subscribe((value) => {
-  console.log("count:", value); // called immediately with 0
+  console.log("count:", value);
 });
 
 count.set(1); // logs: "count: 1"
 count.set(2); // logs: "count: 2"
 
-// Stop listening
 unsubscribe();
-
 count.set(3); // nothing logged
 ```
+
+<Callout type="info">
+  In v3, `subscribe()` no longer fires immediately with the current value on
+  registration. If you need the current value on mount, call `chunk.get()`
+  directly alongside `subscribe()`.
+</Callout>
 
 ---
 
@@ -112,8 +136,6 @@ Resets the chunk back to its initial value and notifies all subscribers.
 const count = chunk(0);
 
 count.set(42);
-count.get(); // 42
-
 count.reset();
 count.get(); // 0
 ```
@@ -122,33 +144,30 @@ count.get(); // 0
 
 ### `destroy()`
 
-Clears all subscribers, resets the value to its initial state, and removes the chunk from the internal registry. Use this for cleanup — for example, when a feature is unmounted.
+Clears all subscribers, resets to initial value, and removes the chunk from the internal registry.
 
 ```ts
 const count = chunk(0);
-
-const unsub = count.subscribe(console.log);
-
-count.destroy(); // all subscribers cleared, chunk removed from registry
+count.subscribe(console.log);
+count.destroy(); // all subscribers cleared
 ```
 
 <Callout type="warn">
-  After calling `destroy()`, the chunk is no longer reactive. Any subsequent
-  `set()` calls will update the value but no subscribers will be notified.
+  After `destroy()`, the chunk is no longer reactive. Subsequent `set()` calls
+  update the value but no subscribers are notified.
 </Callout>
 
 ---
 
 ### `derive(fn)`
 
-Creates a new read-only chunk derived from this one. The derived chunk updates automatically whenever the source changes.
+Creates a new read-only chunk derived from this one. Updates automatically when the source changes.
 
 ```ts
 const price = chunk(100);
 const discounted = price.derive((p) => p * 0.9);
 
 discounted.get(); // 90
-
 price.set(200);
 discounted.get(); // 180
 ```
@@ -157,30 +176,48 @@ See [Derive & Select](/docs/core-concepts/derive) for full details.
 
 ---
 
-## Middleware
+## Configuration
 
-Chunks accept an optional array of middleware functions as a second argument. Middleware runs on every `set()` call and can transform or validate the incoming value.
+`chunk()` accepts an optional config object as a second argument:
 
 ```ts
-import { chunk } from "stunk";
+const user = chunk(
+  { name: "Fola", age: 25 },
+  {
+    name: "user", // name shown in dev warnings
+    strict: true, // throws on unknown keys in set() (dev only)
+    middleware: [logger], // middleware applied on every set()
+  },
+);
+```
+
+### Middleware
+
+Middleware functions run on every `set()` call and can transform or validate the value:
+
+```ts
 import { logger, nonNegativeValidator } from "stunk/middleware";
 
-const count = chunk(0, [logger, nonNegativeValidator]);
+const count = chunk(0, {
+  middleware: [logger(), nonNegativeValidator],
+});
 
 count.set(5); // logs: "Setting value: 5"
 count.set(-1); // throws: "Value must be non-negative!"
 ```
 
-You can also use named middleware for better debugging:
+You can also pass named middleware for better dev-mode error messages:
 
 ```ts
-const count = chunk(0, [
-  { name: "logger", fn: logger },
-  { name: "validator", fn: nonNegativeValidator },
-]);
+const count = chunk(0, {
+  middleware: [
+    { name: "logger", fn: logger() },
+    { name: "validator", fn: nonNegativeValidator },
+  ],
+});
 ```
 
-See [Middleware](/docs/middleware/middleware) for all built-in middleware and how to write your own.
+See [Middleware](/docs/middleware/middleware) for all built-in options and how to write your own.
 
 ---
 
@@ -199,6 +236,7 @@ You can also provide an explicit type:
 ```ts
 const items = chunk<string[]>([]);
 const status = chunk<"idle" | "loading" | "error">("idle");
+const value = chunk<string | null>(null);
 ```
 
 ---
@@ -213,7 +251,7 @@ const status = chunk<"idle" | "loading" | "error">("idle");
   />
   <Card
     title="Computed"
-    description="Derive state from multiple chunks at once"
+    description="Derive state from multiple chunks with auto dependency tracking"
     href="/docs/core-concepts/computed"
   />
   <Card
