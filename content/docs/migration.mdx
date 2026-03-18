@@ -8,65 +8,36 @@ import { Cards, Card } from "fumadocs-ui/components/card";
 
 ---
 
-## v1 → v2
-
-v1 was an early, undocumented API used during initial development. v2 is the first production-ready release with a stable, fully documented API.
-
-<Callout type="warn">
-  v1 is no longer supported. Upgrade to v2 as soon as possible.
-</Callout>
-
-### `update()` removed — use `set()` with an updater
-
-v1 had separate `set()` and `update()` methods. v2 merges them — `set()` now accepts both a direct value and an updater function:
-
-```ts
-// v1
-count.set(10);
-count.update((n) => n + 1);
-
-// v2
-count.set(10);
-count.set((n) => n + 1); // updater function — update() is gone
-```
-
-**Action:** Replace every `count.update(fn)` call with `count.set(fn)`.
-
----
-
-### New APIs in v2
-
-Everything below is new in v2 — none of it existed in v1:
-
-| API                    | Package            | Description                                     |
-| ---------------------- | ------------------ | ----------------------------------------------- |
-| `computed()`           | `stunk`            | Derive from multiple chunks with dirty tracking |
-| `select()`             | `stunk`            | Read-only derived chunk with shallow equality   |
-| `asyncChunk()`         | `stunk`            | Async state with loading/error/data             |
-| `infiniteAsyncChunk()` | `stunk`            | Paginated async state                           |
-| `batch()`              | `stunk`            | Batch multiple updates into one render          |
-| `logger`               | `stunk/middleware` | Console logging middleware                      |
-| `withHistory()`        | `stunk/middleware` | Undo/redo time travel                           |
-| `withPersistence()`    | `stunk/middleware` | localStorage persistence                        |
-| `nonNegativeValidator` | `stunk/middleware` | Value validation middleware                     |
-| `stunk/react`          | `stunk/react`      | All React hooks                                 |
-
----
-
 ## v2 → v3
 
-v3 is not yet released, but these are the confirmed breaking changes and deprecations. **You can start migrating now** — all v3 patterns work in v2 today.
+v3 is currently in alpha. Most changes can be applied **incrementally right now** — you don't need to wait for stable.
 
 <Callout type="info">
-  The v2 API will remain supported during the v3 transition. Migration is opt-in
-  and can be done incrementally.
+  The v2 API is still fully supported. Migration is opt-in and can be done
+  gradually. None of these changes break your existing code until you switch.
 </Callout>
 
 ---
 
-### `computed()` — dependency arrays removed
+### `asyncChunk` — import path changed
 
-v3 introduces automatic dependency tracking. You no longer pass a dependency array:
+In v3, `asyncChunk`, `infiniteAsyncChunk`, and `combineAsyncChunks` moved to `stunk/query`:
+
+```ts
+// v2
+import { asyncChunk } from "stunk";
+
+// v3
+import { asyncChunk } from "stunk/query";
+```
+
+**Action:** Update all async imports to `stunk/query`.
+
+---
+
+### `computed()` — no more dependency arrays
+
+v3 auto-tracks dependencies via `.get()` calls — no array needed:
 
 ```ts
 // v2
@@ -76,97 +47,151 @@ const total = computed([price, quantity], (p, q) => p * q);
 const total = computed(() => price.get() * quantity.get());
 ```
 
-Dependencies are detected automatically by intercepting `.get()` calls during execution — similar to how SolidJS and MobX work.
+Use `.peek()` inside the function to read a value without tracking it as a dependency.
 
-**Action:** When v3 ships, replace `computed([deps], fn)` with `computed(() => fn)` using `.get()` calls inside.
+**Action:** Replace `computed([deps], fn)` with `computed(() => fn)` using `.get()` calls inside.
 
 ---
 
-### `useDerive` removed — derive outside, use `useChunkValue`
+### `null` is now a valid chunk value
 
-`useDerive` added unnecessary indirection. Derive outside the component and pass to `useChunkValue`:
+In v2, `null` threw an error as an initial value. In v3 it's valid — `undefined` is the only forbidden value:
 
-```tsx
-// v2 — deprecated
-function Component() {
-  const doubled = useDerive(count, (n) => n * 2);
-}
+```ts
+// v2 — threw
+chunk(null); // ❌
 
-// v3 — derive once, outside the component
-const doubled = count.derive((n) => n * 2);
-
-function Component() {
-  const value = useChunkValue(doubled);
-}
+// v3 — valid
+chunk<string | null>(null); // ✅
 ```
 
-**Action:** Move all `.derive()` calls outside your components. Replace `useDerive` with `useChunkValue`.
+**Action:** No change needed if you weren't using `null`. If you worked around the v2 limitation, you can simplify now.
 
 ---
 
-### `useComputed` removed — compute outside, use `useChunkValue`
+### `subscribe()` no longer fires immediately
 
-Same pattern as `useDerive`:
+In v2, subscribing to a chunk immediately called the callback with the current value. In v3 it doesn't — the callback only fires on changes:
 
-```tsx
-// v2 — deprecated
-function Component() {
-  const total = useComputed([price, qty], (p, q) => p * q);
-}
+```ts
+// v2 — fired immediately
+count.subscribe((v) => console.log(v)); // logged 0
 
-// v3 — compute once, outside the component
-const total = computed([price, qty], (p, q) => p * q);
-
-function Component() {
-  const value = useChunkValue(total);
-}
+// v3 — only fires on change
+count.subscribe((v) => console.log(v)); // nothing logged
+count.set(1); // logged 1
 ```
 
-**Action:** Move all `computed()` calls outside your components. Replace `useComputed` with `useChunkValue`.
+**Action:** If you relied on the immediate call, read `chunk.get()` directly alongside your `subscribe()`.
 
 ---
 
-### `useChunkProperty` removed — use `useChunkValue` with a selector
+### Middleware renamed
 
-`useChunkProperty` was a thin wrapper with no real benefit:
+`withHistory` and `withPersistence` are renamed in v3:
+
+```ts
+// v2
+import { withHistory, withPersistence } from "stunk/middleware";
+const tracked = withHistory(count);
+const persisted = withPersistence(theme, { key: "theme" });
+
+// v3
+import { history, persist } from "stunk/middleware";
+const tracked = history(count);
+const persisted = persist(theme, { key: "theme" });
+```
+
+**Action:** Update imports and rename usages.
+
+---
+
+### Middleware config shape changed
+
+Middleware is now passed inside a config object:
+
+```ts
+// v2
+const count = chunk(0, [logger, nonNegativeValidator]);
+
+// v3
+const count = chunk(0, { middleware: [logger(), nonNegativeValidator] });
+```
+
+Note `logger()` is now called as a factory — `logger()` not `logger`.
+
+**Action:** Wrap middleware in `{ middleware: [...] }` and add `()` to `logger`.
+
+---
+
+### `history` — `reset()` now clears history
+
+In v2, calling `reset()` on a history-wrapped chunk reset the value but left the history stack intact — `canUndo()` could still return `true`. In v3, `reset()` clears the stack:
+
+```ts
+tracked.set(1);
+tracked.set(2);
+
+tracked.reset();
+tracked.get(); // initial value
+tracked.canUndo(); // false — history cleared too
+```
+
+**Action:** If you relied on history persisting after `reset()`, use `clearHistory()` and `reset()` separately.
+
+---
+
+### `persist` — `clearStorage()` added, `onError` on type mismatch
+
+`persist` now returns a `PersistedChunk` with `clearStorage()`:
+
+```ts
+const persisted = persist(theme, { key: "theme" });
+persisted.clearStorage(); // removes key from storage
+```
+
+`onError` is now also called when the persisted value has a different type than the initial chunk value — not just on serialization errors.
+
+---
+
+### React hooks removed
+
+`useDerive`, `useComputed`, `useChunkProperty`, and `useChunkValues` are removed in v3.
+
+| Removed            | Replace with                                |
+| ------------------ | ------------------------------------------- |
+| `useDerive`        | Derive outside component + `useChunkValue`  |
+| `useComputed`      | Compute outside component + `useChunkValue` |
+| `useChunkProperty` | `useChunkValue(chunk, s => s.key)`          |
+| `useChunkValues`   | Individual `useChunkValue` calls            |
 
 ```tsx
-// v2 — deprecated
+// v2
+const doubled = useDerive(count, (n) => n * 2);
+const total = useComputed([price, qty], (p, q) => p * q);
 const name = useChunkProperty(user, "name");
 
 // v3
-const name = useChunkValue(user, (u) => u.name);
+const doubled = count.derive((n) => n * 2); // outside component
+const total = computed(() => price.get() * qty.get()); // outside component
+
+function Component() {
+  const doubledValue = useChunkValue(doubled);
+  const totalValue = useChunkValue(total);
+  const name = useChunkValue(user, (u) => u.name);
+}
 ```
 
-**Action:** Replace every `useChunkProperty(chunk, key)` with `useChunkValue(chunk, s => s[key])`.
+**Action:** Move all derive/compute calls outside components. Replace removed hooks with `useChunkValue`.
 
 ---
 
-### `useChunkValues` removed — use `useChunkValue` per chunk
-
-`useChunkValues` had a subtle re-render bug when the chunks array was defined inline. The explicit pattern is clearer and safer:
-
-```tsx
-// v2 — deprecated, pitfalls with inline arrays
-const [price, qty] = useChunkValues([priceChunk, qtyChunk]);
-
-// v3 — explicit, no surprises
-const price = useChunkValue(priceChunk);
-const qty = useChunkValue(qtyChunk);
-```
-
-**Action:** Replace every `useChunkValues` call with individual `useChunkValue` calls.
-
----
-
-### v3 React API — the full picture
-
-After migration, your React imports slim down to just four hooks:
+### v3 React API — four hooks only
 
 ```ts
 import {
   useChunk, // read + write
-  useChunkValue, // read-only (derived, computed, select, plain)
+  useChunkValue, // read-only
   useAsyncChunk, // async state
   useInfiniteAsyncChunk, // infinite scroll
 } from "stunk/react";
@@ -176,15 +201,31 @@ import {
 
 ## Migration checklist
 
-### v1 → v2
-
-- [ ] Replace `chunk.update(fn)` with `chunk.set(fn)`
-- [ ] Install latest `stunk` package
-
 ### v2 → v3
 
-- [ ] Move `.derive()` calls outside components, replace `useDerive` with `useChunkValue`
-- [ ] Move `computed()` calls outside components, replace `useComputed` with `useChunkValue`
-- [ ] Replace `useChunkProperty(chunk, key)` with `useChunkValue(chunk, s => s[key])`
-- [ ] Replace `useChunkValues([...])` with individual `useChunkValue` calls
-- [ ] When v3 ships: migrate `computed([deps], fn)` to `computed(() => fn)`
+- [ ] Move `asyncChunk`/`infiniteAsyncChunk`/`combineAsyncChunks` imports to `stunk/query`
+- [ ] Migrate `computed([deps], fn)` → `computed(() => fn)` with `.get()` calls
+- [ ] Wrap middleware in `{ middleware: [...] }`, change `logger` → `logger()`
+- [ ] Rename `withHistory` → `history`, `withPersistence` → `persist`
+- [ ] Replace `useDerive`, `useComputed`, `useChunkProperty`, `useChunkValues` with `useChunkValue`
+- [ ] Audit any code that relies on `subscribe()` firing immediately on registration
+
+---
+
+## v1 → v2
+
+<Callout type="warn">
+  v1 is no longer supported. Upgrade to at least v2.8.1.
+</Callout>
+
+### `update()` removed — use `set()` with an updater
+
+```ts
+// v1
+count.update((n) => n + 1);
+
+// v2+
+count.set((n) => n + 1);
+```
+
+**Action:** Replace every `chunk.update(fn)` call with `chunk.set(fn)`.
