@@ -1,5 +1,5 @@
 ---
-title: withHistory
+title: history
 description: Add undo and redo to any chunk with built-in history tracking.
 icon: History
 ---
@@ -7,22 +7,22 @@ icon: History
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-`withHistory()` wraps an existing chunk and adds a full undo/redo history stack to it. Every `set()` call is recorded — you can travel backwards and forwards through the state timeline.
+`history()` wraps an existing chunk and adds a full undo/redo history stack to it. Every `set()` call is recorded — you can travel backwards and forwards through the state timeline.
 
 ```ts
 import { chunk } from "stunk";
-import { withHistory } from "stunk/middleware";
+import { history } from "stunk/middleware";
 
 const count = chunk(0);
-const countWithHistory = withHistory(count);
+const tracked = history(count);
 
-countWithHistory.set(1);
-countWithHistory.set(2);
-countWithHistory.set(3);
+tracked.set(1);
+tracked.set(2);
+tracked.set(3);
 
-countWithHistory.undo(); // 2
-countWithHistory.undo(); // 1
-countWithHistory.redo(); // 2
+tracked.undo(); // 2
+tracked.undo(); // 1
+tracked.redo(); // 2
 ```
 
 ---
@@ -31,18 +31,18 @@ countWithHistory.redo(); // 2
 
 ### `undo()`
 
-Reverts to the previous value in history. Does nothing if there's no previous state.
+Reverts to the previous value. Does nothing if at the beginning of history.
 
 ```ts
-countWithHistory.undo();
+tracked.undo();
 ```
 
 ### `redo()`
 
-Moves forward to the next value in history. Does nothing if there's no next state.
+Moves forward to the next value. Does nothing if at the end of history.
 
 ```ts
-countWithHistory.redo();
+tracked.redo();
 ```
 
 ### `canUndo()`
@@ -50,9 +50,7 @@ countWithHistory.redo();
 Returns `true` if there is a previous state to revert to.
 
 ```ts
-if (countWithHistory.canUndo()) {
-  countWithHistory.undo();
-}
+if (tracked.canUndo()) tracked.undo();
 ```
 
 ### `canRedo()`
@@ -60,20 +58,17 @@ if (countWithHistory.canUndo()) {
 Returns `true` if there is a next state to move forward to.
 
 ```ts
-if (countWithHistory.canRedo()) {
-  countWithHistory.redo();
-}
+if (tracked.canRedo()) tracked.redo();
 ```
 
 ### `getHistory()`
 
-Returns a copy of all recorded values in order, oldest first.
+Returns a copy of all recorded values, oldest first.
 
 ```ts
-countWithHistory.set(10);
-countWithHistory.set(20);
-
-countWithHistory.getHistory(); // [0, 10, 20]
+tracked.set(10);
+tracked.set(20);
+tracked.getHistory(); // [0, 10, 20]
 ```
 
 ### `clearHistory()`
@@ -81,43 +76,84 @@ countWithHistory.getHistory(); // [0, 10, 20]
 Wipes the history stack, keeping only the current value as the new baseline.
 
 ```ts
-countWithHistory.clearHistory();
-countWithHistory.getHistory(); // [currentValue]
-countWithHistory.canUndo(); // false
+tracked.clearHistory();
+tracked.getHistory(); // [currentValue]
+tracked.canUndo(); // false
 ```
+
+### `reset()`
+
+Resets the chunk to its initial value **and clears the entire history stack**. After reset, `canUndo()` and `canRedo()` both return `false`.
+
+```ts
+tracked.set(1);
+tracked.set(2);
+
+tracked.reset();
+tracked.get(); // 0 (initial value)
+tracked.canUndo(); // false — history cleared
+tracked.canRedo(); // false
+```
+
+<Callout type="info">
+  In v3, `reset()` is overridden to also clear history. In v2, calling `reset()`
+  only reset the value but left history intact — which meant `canUndo()` could
+  return `true` even after a reset.
+</Callout>
 
 ---
 
 ## Options
 
-| Option       | Type     | Default | Description                                                                                      |
-| ------------ | -------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `maxHistory` | `number` | `100`   | Maximum number of history entries to keep. Oldest entries are removed when the limit is reached. |
+| Option           | Type                   | Default | Description                                                           |
+| ---------------- | ---------------------- | ------- | --------------------------------------------------------------------- |
+| `maxHistory`     | `number`               | `100`   | Maximum history entries. Oldest entries removed when limit is reached |
+| `skipDuplicates` | `boolean \| "shallow"` | `false` | Skip recording identical values. See below.                           |
 
 ```ts
-const countWithHistory = withHistory(count, { maxHistory: 50 });
+const tracked = history(count, { maxHistory: 50 });
 ```
 
-<Callout type="warn">
-  When the history limit is reached, the oldest entries are removed
-  automatically and a warning is logged to the console.
+---
+
+## skipDuplicates
+
+Control whether consecutive identical values are recorded:
+
+```ts
+// true — skips strictly equal values (===)
+const tracked = history(count, { skipDuplicates: true });
+
+tracked.set(5);
+tracked.set(5); // skipped — same primitive value
+tracked.getHistory(); // [0, 5]
+
+// 'shallow' — also skips shallowly equal objects
+const form = history(formChunk, { skipDuplicates: "shallow" });
+
+form.set({ name: "Fola", age: 25 });
+form.set({ name: "Fola", age: 25 }); // skipped — same flat values
+```
+
+<Callout type="info">
+  `skipDuplicates: true` uses strict equality (`===`) — new objects with the
+  same values are **not** skipped. Use `'shallow'` for flat object comparison.
 </Callout>
 
 ---
 
 ## Branching history
 
-When you `set()` a new value after undoing, all future history is discarded — just like most editors:
+`set()` after an `undo()` discards all forward history — just like most editors:
 
 ```ts
-countWithHistory.set(1);
-countWithHistory.set(2);
-countWithHistory.set(3);
+tracked.set(1);
+tracked.set(2);
+tracked.set(3);
 
-countWithHistory.undo(); // back to 2
-countWithHistory.set(99); // history is now [0, 1, 2, 99] — "3" is gone
-
-countWithHistory.canRedo(); // false
+tracked.undo(); // back to 2
+tracked.set(99); // history is now [0, 1, 2, 99] — "3" is gone
+tracked.canRedo(); // false
 ```
 
 ---
@@ -126,26 +162,23 @@ countWithHistory.canRedo(); // false
 
 ```tsx
 import { chunk } from "stunk";
-import { withHistory } from "stunk/middleware";
+import { history } from "stunk/middleware";
 import { useChunk } from "stunk/react";
 
 const counter = chunk(0);
-const counterWithHistory = withHistory(counter);
+const tracked = history(counter);
 
 function Counter() {
-  const [count, setCount] = useChunk(counterWithHistory);
-
-  const canUndo = counterWithHistory.canUndo();
-  const canRedo = counterWithHistory.canRedo();
+  const [count, setCount] = useChunk(tracked);
 
   return (
     <div>
       <p>{count}</p>
       <button onClick={() => setCount((c) => c + 1)}>Increment</button>
-      <button onClick={() => counterWithHistory.undo()} disabled={!canUndo}>
+      <button onClick={() => tracked.undo()} disabled={!tracked.canUndo()}>
         Undo
       </button>
-      <button onClick={() => counterWithHistory.redo()} disabled={!canRedo}>
+      <button onClick={() => tracked.redo()} disabled={!tracked.canRedo()}>
         Redo
       </button>
     </div>
@@ -153,15 +186,13 @@ function Counter() {
 }
 ```
 
-Since `useChunk` subscribes to the chunk and calls `setState` on every change, the component re-renders whenever the value updates — and `canUndo()` / `canRedo()` are re-evaluated as part of that render, keeping the buttons in sync automatically.
-
 ---
 
 ## What's next?
 
 <Cards>
   <Card
-    title="withPersistence"
+    title="persist"
     description="Persist chunk state to localStorage or any Storage API"
     href="/docs/middleware/with-persistence"
   />
