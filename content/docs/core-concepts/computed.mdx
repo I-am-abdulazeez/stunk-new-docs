@@ -7,7 +7,7 @@ icon: Cpu
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-`computed()` creates a derived chunk that depends on **multiple source chunks**. It automatically recomputes whenever any of its dependencies change, and only notifies subscribers when the result actually differs from the previous value.
+`computed()` creates a derived chunk that automatically tracks its dependencies and recomputes whenever any of them change. Dependencies are detected by monitoring which chunks call `.get()` during execution — no dependency arrays needed.
 
 ```ts
 import { chunk, computed } from "stunk";
@@ -15,7 +15,7 @@ import { chunk, computed } from "stunk";
 const price = chunk(100);
 const quantity = chunk(3);
 
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
 total.get(); // 300
 
@@ -23,43 +23,48 @@ quantity.set(5);
 total.get(); // 500 — recomputed automatically
 ```
 
+<Callout type="info">
+  Any chunk whose `.get()` is called inside the compute function becomes a
+  dependency automatically. Use `.peek()` to read a value without tracking it.
+</Callout>
+
 ---
 
 ## API
 
 ```ts
-computed(dependencies, computeFn): Computed<TResult>
+computed(computeFn): Computed<T>
 ```
 
-| Parameter      | Type                     | Description                                          |
-| -------------- | ------------------------ | ---------------------------------------------------- |
-| `dependencies` | `Chunk<any>[]`           | Array of source chunks to depend on                  |
-| `computeFn`    | `(...values) => TResult` | Function receiving current values of each dependency |
-
-The argument order in `computeFn` matches the order of `dependencies`.
+| Parameter   | Type      | Description                                                     |
+| ----------- | --------- | --------------------------------------------------------------- |
+| `computeFn` | `() => T` | A function that derives the value. Any `.get()` call is tracked |
 
 ---
 
 ## The `Computed` interface
 
-A computed chunk extends `Chunk<T>` with two additional methods:
+A computed chunk extends `ReadOnlyChunk<T>` with two additional methods:
 
 ### `isDirty()`
 
-Returns `true` if any dependency has changed since the last computation. Stunk uses this internally to decide whether to recompute — you can also use it yourself for debugging or optimization.
+Returns `true` if any dependency has changed since the last computation.
 
 ```ts
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
 total.isDirty(); // false
 
 price.set(200);
-total.isDirty(); // false — already recomputed synchronously
+total.isDirty(); // true — not yet recomputed
+
+total.get();
+total.isDirty(); // false — recomputed on access
 ```
 
 ### `recompute()`
 
-Manually forces recomputation from current dependency values. Normally you don't need this — Stunk recomputes automatically on every dependency change.
+Forces recomputation immediately. Normally not needed — Stunk recomputes automatically on `get()` or when subscribers are active.
 
 ```ts
 total.recompute();
@@ -67,59 +72,99 @@ total.recompute();
 
 ---
 
-## Read-only enforcement
+## Lazy vs eager evaluation
 
-Like `select()`, computed chunks are **read-only**. Calling `set()` throws an error:
+Computed values are **lazy by default** — they only recompute when accessed via `get()`. When a computed has active subscribers, it switches to **eager mode** and recomputes immediately when any dependency changes.
 
 ```ts
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
-total.set(999); // ❌ throws: "Cannot set values directly on computed"
+// No subscribers — lazy, recomputes on get()
+price.set(200);
+total.isDirty(); // true
+total.get(); // recomputes now → 600
+
+// With a subscriber — eager, recomputes immediately on change
+const unsub = total.subscribe((v) => console.log("total:", v));
+price.set(50); // logs: "total: 150" immediately
+```
+
+---
+
+## peek() — non-tracking reads
+
+Use `.peek()` inside a compute function to read a value without registering it as a dependency:
+
+```ts
+const taxRate = chunk(0.1);
+const subtotal = chunk(200);
+
+const total = computed(() => subtotal.get() * (1 + taxRate.peek()));
+// only recomputes when subtotal changes — taxRate changes are ignored
+```
+
+---
+
+## Read-only
+
+Computed chunks are read-only. Calling `set()` or `reset()` will throw:
+
+```ts
+total.set(999); // ❌ TypeError — set does not exist on Computed<T>
+total.reset(); // ❌ TypeError — reset does not exist on Computed<T>
 ```
 
 To change the result, update the source chunks:
 
 ```ts
 price.set(50);
-total.get(); // 150 (50 * 3)
+total.get(); // 150
 ```
 
-`reset()` on a computed chunk resets **all its dependencies** back to their initial values:
+---
+
+## Dynamic dependencies
+
+Dependencies are re-tracked on every recompute — so conditional logic works correctly:
 
 ```ts
-price.set(200);
-quantity.set(10);
+const useDiscount = chunk(true);
+const base = chunk(100);
+const discount = chunk(0.2);
 
-total.reset(); // resets price and quantity to their initial values
-total.get(); // 300 (100 * 3)
+const price = computed(() =>
+  useDiscount.get() ? base.get() * (1 - discount.get()) : base.get(),
+);
+
+price.get(); // 80 (discount applied)
+
+useDiscount.set(false);
+price.get(); // 100 (discount branch not taken — discount no longer a dependency)
 ```
 
 ---
 
 ## Performance
 
-Stunk uses a fast path for primitives and shallow equality for objects to avoid unnecessary updates:
+Stunk uses strict equality for primitives and shallow equality for objects to avoid unnecessary subscriber notifications:
 
-- For **primitives** (numbers, strings, booleans) — strict `!==` comparison
-- For **objects** — `shallowEqual` check to avoid re-notifying when the shape and values are the same
-
-This means computed chunks only propagate updates when the result genuinely changes.
+- **Primitives** — only notifies if `newValue !== cachedValue`
+- **Objects** — only notifies if `!shallowEqual(newValue, cachedValue)`
 
 ---
 
 ## TypeScript
 
-Types flow through automatically from dependencies:
+Types are inferred automatically from the compute function:
 
 ```ts
 const price = chunk(100); // Chunk<number>
 const quantity = chunk(3); // Chunk<number>
-const label = chunk("Total"); // Chunk<string>
 
-const summary = computed(
-  [price, quantity, label],
-  (p, q, l) => `${l}: ₦${p * q}`, // (number, number, string) => string
-);
+const total = computed(() => price.get() * quantity.get());
+// Computed<number>
+
+const label = computed(() => `Total: ₦${total.get()}`);
 // Computed<string>
 ```
 
@@ -127,40 +172,29 @@ const summary = computed(
 
 ## In React
 
-Derive outside the component, then pass to `useChunkValue()` since computed is read-only:
+Define outside the component, then read with `useChunkValue()`:
 
 ```tsx
 import { chunk, computed } from "stunk";
-import { useChunkValue } from "stunk/react";
+import { useChunk, useChunkValue } from "stunk/react";
 
 const price = chunk(100);
 const quantity = chunk(2);
-const total = computed([price, quantity], (p, q) => p * q); // outside component
+const total = computed(() => price.get() * quantity.get());
 
 function OrderSummary() {
-  const totalValue = useChunkValue(total); // read-only
+  const [qty, setQty] = useChunk(quantity);
+  const totalValue = useChunkValue(total);
 
-  return <p>Total: ${totalValue}</p>;
+  return (
+    <div>
+      <p>Quantity: {qty}</p>
+      <p>Total: ${totalValue}</p>
+      <button onClick={() => setQty((n) => n + 1)}>Add</button>
+    </div>
+  );
 }
 ```
-
-<Callout type="warn">
-  `useComputed` exists in v2 but will be **removed in v3**. Compute outside the
-  component and pass the result directly to `useChunkValue()` instead.
-</Callout>
-
----
-
-## Coming in v3
-
-The `computed()` API is being redesigned in v3 to automatically detect dependencies — no more arrays:
-
-```ts
-// v3 — auto dependency tracking
-const total = computed(() => price.get() * quantity.get());
-```
-
-The v2 API will remain supported during the transition.
 
 ---
 
