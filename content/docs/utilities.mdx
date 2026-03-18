@@ -6,23 +6,18 @@ description: Helper functions for working with chunks and async state.
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-Stunk exports a set of utility functions for inspecting chunks, guarding against invalid values, and combining async state.
+Stunk exports a set of utility functions for inspecting chunks and guarding against invalid values.
 
 ```ts
-import {
-  isChunk,
-  isValidChunk,
-  isValidChunkValue,
-  once,
-  combineAsyncChunks,
-} from "stunk";
+import { isChunk, isValidChunk, isValidChunkValue, once } from "stunk";
+import { combineAsyncChunks } from "stunk/query";
 ```
 
 ---
 
 ## `isChunk(value)`
 
-Type guard that checks whether an unknown value is a valid `Chunk`. It verifies that the value is an object with all required chunk methods: `get`, `set`, `subscribe`, `derive`, `reset`, and `destroy`.
+Type guard that checks whether an unknown value is a valid `Chunk`. Verifies the value is an object with all required chunk methods: `get`, `set`, `peek`, `subscribe`, `derive`, `reset`, and `destroy`.
 
 ```ts
 import { isChunk, chunk } from "stunk";
@@ -35,7 +30,7 @@ isChunk(null); // false
 isChunk({}); // false
 ```
 
-Useful when building generic utilities or working with unknown values that may or may not be chunks:
+Useful when building generic utilities that may receive unknown values:
 
 ```ts
 function printValue(value: unknown) {
@@ -49,7 +44,7 @@ function printValue(value: unknown) {
 
 ## `isValidChunk(value, validateBehavior?)`
 
-A stricter version of `isChunk`. In addition to checking the chunk interface, it can optionally validate that the chunk behaves correctly by calling `get()` and `set()` and verifying no errors are thrown.
+A stricter version of `isChunk`. Optionally validates that the chunk behaves correctly by calling `get()` and `set()` and verifying no errors are thrown.
 
 ```ts
 import { isValidChunk, chunk } from "stunk";
@@ -68,30 +63,29 @@ isValidChunk({ get: () => 0 }); // false — missing required methods
 
 <Callout type="info">
   Use `isChunk` for most cases. `isValidChunk` with `validateBehavior: true` is
-  useful when you need to verify that a chunk actually works — for example in
-  tests or when accepting chunks from external sources.
+  useful in tests or when accepting chunks from external sources.
 </Callout>
 
 ---
 
 ## `isValidChunkValue(value)`
 
-Checks whether a value is valid as a chunk's initial value. Currently this just verifies the value is not `null`, since `null` is not allowed as a chunk value.
+Checks whether a value is valid as a chunk value. Returns `false` only for `undefined` — `null` is valid in v3.
 
 ```ts
 import { isValidChunkValue } from "stunk";
 
 isValidChunkValue(0); // true
 isValidChunkValue("hello"); // true
-isValidChunkValue(undefined); // true
-isValidChunkValue(null); // false
+isValidChunkValue(null); // true — null is valid in v3
+isValidChunkValue(undefined); // false — undefined is never allowed
 ```
 
 ---
 
 ## `once(fn)`
 
-Returns a wrapper function that calls `fn` only on the first invocation. Subsequent calls return the cached result without calling `fn` again.
+Returns a wrapper function that calls `fn` only on the first invocation. Subsequent calls return the cached result.
 
 ```ts
 import { once } from "stunk";
@@ -103,28 +97,25 @@ const initialize = once(() => {
 
 initialize(); // logs "initialized!", returns 42
 initialize(); // returns 42, no log
-initialize(); // returns 42, no log
 ```
 
-Useful for lazy initialization of chunks or expensive setup that should only run once:
+Useful for lazy initialization of chunks that should only be created once:
 
 ```ts
-const getStore = once(() => {
-  return chunk({ user: null, theme: "light" });
-});
+const getStore = once(() => chunk({ user: null, theme: "light" }));
 
 const store = getStore(); // chunk created
-const same = getStore(); // same chunk returned, not recreated
+const same = getStore(); // same chunk returned
 ```
 
 ---
 
 ## `combineAsyncChunks(chunks)`
 
-Merges multiple async chunks into a single reactive chunk with unified `loading`, `error`, `errors`, and `data` state. See the [Combine Async Chunks](/docs/async/combine-async-chunks) page for full documentation.
+Merges multiple async chunks into a single reactive chunk with unified `loading`, `error`, `errors`, and `data` state. Imported from `stunk/query`.
 
 ```ts
-import { asyncChunk, combineAsyncChunks } from "stunk";
+import { asyncChunk, combineAsyncChunks } from "stunk/query";
 
 const combined = combineAsyncChunks({
   user: userChunk,
@@ -134,6 +125,8 @@ const combined = combineAsyncChunks({
 combined.get();
 // { loading: true, error: null, errors: {}, data: { user: null, posts: null } }
 ```
+
+See [Combine Async Chunks](/docs/async/combine-async-chunks) for full documentation.
 
 ---
 
