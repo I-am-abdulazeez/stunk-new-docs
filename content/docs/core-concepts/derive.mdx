@@ -7,7 +7,7 @@ icon: GitBranch
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-`.derive()` is a method on every chunk that creates a new reactive chunk based on a transformation function. The derived chunk updates automatically whenever the source changes.
+`.derive()` is a method on every chunk that creates a new reactive, read-only chunk based on a transformation function. The derived chunk updates automatically whenever the source changes.
 
 ```ts
 import { chunk } from "stunk";
@@ -23,7 +23,7 @@ discounted.get(); // 180
 formatted.get(); // "₦200.00"
 ```
 
-The derived chunk is **read-only** — you can't set it directly. Update the source chunk instead.
+The derived chunk is **read-only** at the TypeScript type level — `set()` and `reset()` do not exist on `ReadOnlyChunk<T>`. Update the source chunk instead.
 
 ---
 
@@ -44,15 +44,12 @@ label.get(); // "Value: 10"
 
 ## Cleanup
 
-A derived chunk stays subscribed to its source as long as both exist. If you destroy the **source chunk**, the derived chunk stops receiving updates automatically.
-
-If you want to stop a derived chunk from updating while keeping the source alive, call `destroy()` on the derived chunk:
+A derived chunk stays subscribed to its source as long as both exist. To stop a derived chunk from updating while keeping the source alive, call `destroy()` on the derived chunk:
 
 ```ts
 const discounted = price.derive((p) => p * 0.9);
 
-// Stop listening to price, but price still works fine
-discounted.destroy();
+discounted.destroy(); // stops listening, source still works
 ```
 
 <Callout type="info">
@@ -64,27 +61,32 @@ discounted.destroy();
 
 ## In React
 
-Derive your data **outside** the component, then pass it to `useChunkValue()` since you're only reading:
+Define the derived chunk outside the component, then read with `useChunkValue()`:
 
 ```tsx
 import { chunk } from "stunk";
 import { useChunkValue } from "stunk/react";
 
 const price = chunk(100);
-const discounted = price.derive((p) => p * 0.9); // derived outside
+const discounted = price.derive((p) => p * 0.9);
 
 function DiscountedPrice() {
-  const value = useChunkValue(discounted); // read-only
+  const value = useChunkValue(discounted);
 
   return <p>Discounted: ${value}</p>;
 }
 ```
 
-<Callout type="warn">
-  `useDerive` exists in v2 but will be **removed in v3**. It adds no value over
-  deriving outside the component and passing to `useChunkValue()`. Start using
-  the pattern above now.
-</Callout>
+---
+
+## `.derive()` vs `select()` vs `computed()`
+
+|                  | `.derive()`       | `select()`              | `computed()`           |
+| ---------------- | ----------------- | ----------------------- | ---------------------- |
+| Source           | Single chunk      | Single chunk            | Multiple chunks        |
+| Shallow equality | No                | Yes (`useShallowEqual`) | Yes (automatic)        |
+| Chainable        | Yes               | Yes                     | Via `derive()`         |
+| Best for         | Simple transforms | Object slices           | Multi-chunk derivation |
 
 ---
 
@@ -98,7 +100,7 @@ function DiscountedPrice() {
   />
   <Card
     title="Computed"
-    description="Derive from multiple chunks simultaneously"
+    description="Derive from multiple chunks with auto dependency tracking"
     href="/docs/core-concepts/computed"
   />
 </Cards>
