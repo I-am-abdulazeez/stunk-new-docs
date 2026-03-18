@@ -1,0 +1,137 @@
+---
+title: persist
+description: Persist chunk state to localStorage or any Web Storage API.
+icon: HardDrive
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`persist()` wraps an existing chunk and automatically syncs its value to a storage backend — `localStorage` by default. The persisted value is loaded back on initialization, so state survives page refreshes.
+
+```ts
+import { chunk } from "stunk";
+import { persist } from "stunk/middleware";
+
+const theme = chunk<"light" | "dark">("light");
+const persistedTheme = persist(theme, { key: "app-theme" });
+
+persistedTheme.set("dark");
+// stored in localStorage under "app-theme"
+
+// On next page load — automatically restored to "dark"
+```
+
+---
+
+## API reference
+
+`persist()` returns a `PersistedChunk<T>` — the same `Chunk<T>` interface plus one additional method:
+
+### `clearStorage()`
+
+Removes the persisted key from storage without destroying the chunk. Useful for logout or cache invalidation:
+
+```ts
+persistedTheme.clearStorage();
+// localStorage key removed — chunk still works normally
+```
+
+---
+
+## Options
+
+| Option        | Type                         | Default          | Description                                    |
+| ------------- | ---------------------------- | ---------------- | ---------------------------------------------- |
+| `key`         | `string`                     | **required**     | The storage key                                |
+| `storage`     | `Storage`                    | `localStorage`   | Any object implementing the Web Storage API    |
+| `serialize`   | `(value: T) => string`       | `JSON.stringify` | Custom serializer                              |
+| `deserialize` | `(value: string) => T`       | `JSON.parse`     | Custom deserializer                            |
+| `onError`     | `(error, operation) => void` | —                | Called on load/save errors and type mismatches |
+
+---
+
+## Error handling
+
+`persist` catches and logs errors from both loading and saving. A corrupt storage entry won't crash your app — the chunk falls back to its initial value. Pass `onError` to handle errors yourself:
+
+```ts
+const persistedTheme = persist(theme, {
+  key: "app-theme",
+  onError: (error, operation) => {
+    console.error(`Persist ${operation} failed:`, error.message);
+  },
+});
+```
+
+`operation` is either `'load'` or `'save'`. `onError` is also called when the stored value has a different type than the initial chunk value — for example, if an array was stored but the chunk expects an object.
+
+---
+
+## Custom storage
+
+Pass any object implementing the Web Storage API — for example `sessionStorage`:
+
+```ts
+const sessionTheme = persist(theme, {
+  key: "app-theme",
+  storage: sessionStorage,
+});
+```
+
+---
+
+## Custom serialization
+
+For values that don't serialize cleanly with `JSON.stringify`:
+
+```ts
+const lastVisited = chunk(new Date());
+
+const persisted = persist(lastVisited, {
+  key: "last-visited",
+  serialize: (date) => date.toISOString(),
+  deserialize: (str) => new Date(str),
+});
+```
+
+---
+
+## SSR safety
+
+`persist` uses `localStorage` by default which is only available in browsers. In SSR environments, `persist` detects this automatically, logs a warning, and returns the base chunk unchanged — no crash, no side effects.
+
+<Callout type="warn">
+  If you need persistence in SSR, pass a custom `storage` implementation that
+  works server-side, or guard the call with `typeof window !== 'undefined'`.
+</Callout>
+
+---
+
+## Composing with other middleware
+
+`persist` composes naturally with `history` and chunk middleware:
+
+```ts
+import { chunk } from "stunk";
+import { logger } from "stunk/middleware";
+import { history, persist } from "stunk/middleware";
+
+const count = chunk(0, { middleware: [logger()] });
+const tracked = history(count);
+const persisted = persist(tracked, { key: "count" });
+
+// logger on every set(), history tracking, and persistence — all active
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="React Integration"
+    description="All React hooks for working with Stunk"
+    href="/docs/integrations/react"
+  />
+</Cards>
