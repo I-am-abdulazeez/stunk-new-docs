@@ -7,10 +7,10 @@ icon: RefreshCw
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-`asyncChunk()` wraps an async fetcher function and gives you reactive `loading`, `error`, `data`, and `reload` states out of the box — no manual state juggling needed.
+`asyncChunk()` wraps an async fetcher function and gives you reactive `loading`, `error`, `data`, and `lastFetched` states out of the box — no manual state juggling needed.
 
 ```ts
-import { asyncChunk } from "stunk";
+import { asyncChunk } from "stunk/query";
 
 const userChunk = asyncChunk(async () => {
   const res = await fetch("/api/user");
@@ -18,20 +18,38 @@ const userChunk = asyncChunk(async () => {
 });
 ```
 
-The chunk fetches immediately on creation and keeps its state reactive. Subscribe to it or use it in React with `useAsyncChunk`.
+Fetchers with no parameters are called automatically on creation. Fetchers that take parameters wait for `setParams()` or `reload()`.
 
 ---
 
 ## State shape
 
-Every async chunk exposes these reactive properties:
+| Property            | Type                  | Description                                                        |
+| ------------------- | --------------------- | ------------------------------------------------------------------ |
+| `data`              | `T \| null`           | The resolved value, or `null` before first fetch                   |
+| `loading`           | `boolean`             | `true` while a fetch is in progress                                |
+| `error`             | `E \| null`           | The error if the last fetch failed, otherwise `null`               |
+| `lastFetched`       | `number \| undefined` | Timestamp of the last successful fetch                             |
+| `isPlaceholderData` | `boolean`             | `true` when showing previous data while a new fetch is in progress |
 
-| Property  | Type                  | Description                                          |
-| --------- | --------------------- | ---------------------------------------------------- |
-| `data`    | `T \| null`           | The resolved value, or `null` before first fetch     |
-| `loading` | `boolean`             | `true` while a fetch is in progress                  |
-| `error`   | `E \| null`           | The error if the last fetch failed, otherwise `null` |
-| `reload`  | `() => Promise<void>` | Manually trigger a refetch                           |
+---
+
+## Options
+
+| Option                         | Type                       | Default  | Description                                            |
+| ------------------------------ | -------------------------- | -------- | ------------------------------------------------------ |
+| `key`                          | `string`                   | auto     | Deduplication key — concurrent calls share one request |
+| `enabled`                      | `boolean \| () => boolean` | `true`   | Disable fetching until ready                           |
+| `initialData`                  | `T`                        | `null`   | Seed data before the first fetch                       |
+| `keepPreviousData`             | `boolean`                  | `false`  | Show previous data while refetching — no UI flicker    |
+| `onSuccess`                    | `(data: T) => void`        | —        | Called after every successful fetch                    |
+| `onError`                      | `(error: E) => void`       | —        | Called when all retries are exhausted                  |
+| `retryCount`                   | `number`                   | `0`      | Number of retries on failure                           |
+| `retryDelay`                   | `number`                   | `1000`   | ms between retries                                     |
+| `refresh.staleTime`            | `number`                   | `0`      | ms before data is considered stale                     |
+| `refresh.cacheTime`            | `number`                   | `300000` | ms to keep cache after last subscriber leaves          |
+| `refresh.refetchInterval`      | `number`                   | —        | Auto-refetch interval in ms                            |
+| `refresh.refetchOnWindowFocus` | `boolean`                  | `false`  | Refetch when window regains focus                      |
 
 ---
 
@@ -39,7 +57,7 @@ Every async chunk exposes these reactive properties:
 
 ### `reload(params?)`
 
-Forces a fresh fetch, ignoring stale time. Optionally pass new params.
+Forces a fresh fetch, ignoring stale time.
 
 ```ts
 await postsChunk.reload();
@@ -48,7 +66,7 @@ await postsChunk.reload({ category: "engineering" });
 
 ### `refresh(params?)`
 
-Smart refresh — only fetches if data is stale (respects `staleTime`). Does nothing if data is still fresh.
+Smart refresh — only fetches if data is stale. Does nothing if data is still fresh.
 
 ```ts
 await postsChunk.refresh();
@@ -56,7 +74,7 @@ await postsChunk.refresh();
 
 ### `mutate(mutator)`
 
-Update `data` directly without triggering a network request. Useful for optimistic updates.
+Update `data` directly without a network request. Useful for optimistic updates.
 
 ```ts
 postsChunk.mutate((current) => [...(current ?? []), newPost]);
@@ -64,15 +82,24 @@ postsChunk.mutate((current) => [...(current ?? []), newPost]);
 
 ### `setParams(params)`
 
-Update the fetcher params and immediately trigger a fresh fetch.
+Update fetcher params and trigger a fresh fetch. Pass `null` for a key to remove it.
 
 ```ts
 postsChunk.setParams({ category: "engineering" });
+postsChunk.setParams({ category: null }); // removes category
+```
+
+### `clearParams()`
+
+Wipes all current params and refetches.
+
+```ts
+postsChunk.clearParams();
 ```
 
 ### `reset()`
 
-Resets back to initial state and re-fetches from scratch.
+Resets to initial state and re-fetches from scratch.
 
 ```ts
 postsChunk.reset();
@@ -80,107 +107,55 @@ postsChunk.reset();
 
 ### `cleanup()`
 
-Clears any active polling intervals and cache timers. Call this when you're done with the chunk.
+Safe cleanup — only tears down intervals and listeners if no active subscribers remain.
 
 ```ts
 postsChunk.cleanup();
 ```
 
----
+### `forceCleanup()`
+
+Tears down all side effects regardless of active subscribers.
 
 ```ts
-import { asyncChunk } from "stunk";
-
-const postsChunk = asyncChunk(async () => {
-  const res = await fetch("/api/posts");
-  return res.json() as Promise<Post[]>;
-});
-
-// Read current state
-const { data, loading, error } = postsChunk.get();
-
-// Subscribe to changes
-postsChunk.subscribe(({ data, loading, error }) => {
-  console.log({ data, loading, error });
-});
-
-// Refetch manually
-await postsChunk.reload();
+postsChunk.forceCleanup();
 ```
 
 ---
 
-## With parameters
+## Request deduplication
 
-Pass parameters to the fetcher using the `params` option:
+Use `key` to deduplicate concurrent requests — if two components call `reload()` simultaneously on a chunk with the same key, only one request fires:
 
 ```ts
-const postChunk = asyncChunk(async ({ id }: { id: string }) => {
-  const res = await fetch(`/api/posts/${id}`);
-  return res.json() as Promise<Post>;
-});
+const userChunk = asyncChunk(fetchUser, { key: "user" });
 
-// Set params and trigger a fetch
-postChunk.setParams({ id: "42" });
+userChunk.reload();
+userChunk.reload(); // returns the same in-flight promise
 ```
 
 ---
 
-## Retry on failure
+## keepPreviousData
 
-Configure automatic retries with `retryCount` and `retryDelay`:
-
-```ts
-const dataChunk = asyncChunk(fetcher, {
-  retryCount: 3, // retry up to 3 times
-  retryDelay: 1000, // wait 1s between retries
-});
-```
-
----
-
-## Stale & cache time
-
-Control how long data is considered fresh and how long it stays cached:
+When params change, the default behavior is to show `null` while loading. Set `keepPreviousData: true` to keep showing the previous data instead — no flash of empty state:
 
 ```ts
-const dataChunk = asyncChunk(fetcher, {
-  staleTime: 30_000, // data is fresh for 30s — won't refetch
-  cacheTime: 60_000, // cache is kept for 60s after last subscriber leaves
-});
-```
+const postsChunk = asyncChunk(
+  ({ category }: { category: string }) => fetchPosts(category),
+  { keepPreviousData: true },
+);
 
----
-
-## Error handling
-
-Use the `onError` callback to react to failures:
-
-```ts
-const dataChunk = asyncChunk(fetcher, {
-  onError: (error) => {
-    console.error("Fetch failed:", error.message);
-  },
-});
-```
-
-Or read `error` directly from state:
-
-```ts
-const { error } = dataChunk.get();
-if (error) {
-  console.error(error.message);
-}
+// While loading new category, isPlaceholderData is true and data still shows old posts
+postsChunk.setParams({ category: "engineering" });
 ```
 
 ---
 
 ## In React
 
-Use `useAsyncChunk` to consume async state reactively in a component:
-
 ```tsx
-import { asyncChunk } from "stunk";
+import { asyncChunk } from "stunk/query";
 import { useAsyncChunk } from "stunk/react";
 
 const postsChunk = asyncChunk(async () => {
@@ -209,11 +184,6 @@ function PostList() {
 }
 ```
 
-<Callout type="info">
-  `useAsyncChunk` automatically triggers the initial fetch and re-renders the
-  component whenever `loading`, `data`, or `error` changes.
-</Callout>
-
 ---
 
 ## What's next?
@@ -225,8 +195,8 @@ function PostList() {
     href="/docs/async/infinite-async-chunk"
   />
   <Card
-    title="Middleware"
-    description="Extend chunks with logging, persistence, and validation"
-    href="/docs/middleware/middleware"
+    title="Combine Async Chunks"
+    description="Merge multiple async chunks into one unified state"
+    href="/docs/async/combine-async-chunks"
   />
 </Cards>
