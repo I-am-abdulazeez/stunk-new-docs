@@ -7,7 +7,7 @@ icon: MousePointer2
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-`select()` creates a **read-only derived chunk** from a source chunk using a selector function. It's similar to `.derive()` but gives you an extra option — **shallow equality checking** — which is useful when your selector returns objects and you want to avoid unnecessary updates.
+`select()` creates a **read-only derived chunk** from a source chunk using a selector function. It's similar to `.derive()` but adds one important option — **shallow equality checking** — which prevents unnecessary updates when your selector returns an object.
 
 ```ts
 import { chunk, select } from "stunk";
@@ -18,22 +18,22 @@ const userName = select(user, (u) => u.name);
 
 userName.get(); // "Fola"
 
-user.set((prev) => ({ ...prev, age: 26 }));
-userName.get(); // "Fola" — didn't change, no update triggered
+user.set((prev) => ({ ...prev, age: 26 })); // age changed, name didn't
+userName.get(); // "Fola" — no update triggered
 ```
 
 ---
 
 ## Shallow equality
 
-By default, `select()` uses strict reference equality (`!==`) to detect changes — same as `.derive()`. This is fine for primitives, but for object selectors it means a new object reference always triggers an update even if the contents are identical.
+By default, `select()` uses strict reference equality (`!==`) to detect changes. This is fine for primitives, but for object selectors a new object reference always triggers an update even if the contents are identical.
 
 Enable `useShallowEqual` to compare object contents instead:
 
 ```ts
 const user = chunk({ name: "Fola", age: 25 });
 
-// Without useShallowEqual — new object reference = always updates
+// Without useShallowEqual — new reference = always updates
 const info = select(user, (u) => ({ name: u.name, age: u.age }));
 
 // With useShallowEqual — only updates when name or age actually changes
@@ -42,24 +42,21 @@ const info = select(user, (u) => ({ name: u.name, age: u.age }), {
 });
 ```
 
-This is especially useful in React — it prevents unnecessary re-renders when selecting a slice of a large object chunk.
+This is especially useful in React — it prevents re-renders when selecting a slice of a large object chunk that hasn't meaningfully changed.
 
 ---
 
-## Read-only enforcement
+## Read-only
 
-`select()` is strictly read-only. Calling `set()` or `reset()` throws:
+`select()` returns a `ReadOnlyChunk<T>` — `set()` and `reset()` are not present on the returned object. Update the source chunk instead:
 
 ```ts
 const userName = select(user, (u) => u.name);
 
-userName.set("Tunde"); // ❌ "Cannot set values directly on a selector"
-userName.reset(); // ❌ "Cannot reset a selector chunk"
-```
+// @ts-expect-error — set does not exist on ReadOnlyChunk
+userName.set("Tunde");
 
-Update the source chunk instead:
-
-```ts
+// Update source instead
 user.set((prev) => ({ ...prev, name: "Tunde" }));
 userName.get(); // "Tunde"
 ```
@@ -68,12 +65,32 @@ userName.get(); // "Tunde"
 
 ## Chaining
 
-Selectors can be chained — each chain returns a new selector that inherits the same options:
+Selectors can be chained — each returns a new `ReadOnlyChunk` that inherits the same options:
 
 ```ts
 const user = chunk({ profile: { name: "Fola", age: 25 } });
 const profile = select(user, (u) => u.profile);
-const userName = select(profile, (p) => p.name);
+const name = select(profile, (p) => p.name);
+```
+
+---
+
+## In React
+
+Define outside the component, then read with `useChunkValue()`:
+
+```tsx
+import { chunk, select } from "stunk";
+import { useChunkValue } from "stunk/react";
+
+const user = chunk({ name: "Fola", age: 25, role: "admin" });
+const userName = select(user, (u) => u.name, { useShallowEqual: true });
+
+function UserName() {
+  const name = useChunkValue(userName);
+
+  return <p>Hello, {name}</p>;
+}
 ```
 
 ---
@@ -87,34 +104,6 @@ const userName = select(profile, (p) => p.name);
 | Shallow equality | No                | Yes (`useShallowEqual`)                 |
 | Chainable        | Yes               | Yes                                     |
 | Best for         | Simple transforms | Object slices, perf-sensitive selectors |
-
-Use `.derive()` for simple value transforms. Use `select()` when you're slicing an object chunk and want precise control over when updates propagate.
-
----
-
-## In React
-
-Derive outside the component, then pass to `useChunkValue()` since selectors are read-only:
-
-```tsx
-import { chunk, select } from "stunk";
-import { useChunkValue } from "stunk/react";
-
-const user = chunk({ name: "Fola", age: 25, role: "admin" });
-const userName = select(user, (u) => u.name, { useShallowEqual: true });
-
-function UserName() {
-  const name = useChunkValue(userName); // read-only
-
-  return <p>Hello, {name}</p>;
-}
-```
-
-<Callout type="warn">
-  `useDerive` exists in v2 but will be **removed in v3**. Derive or select
-  outside the component and pass the result directly to `useChunkValue()`
-  instead.
-</Callout>
 
 ---
 
