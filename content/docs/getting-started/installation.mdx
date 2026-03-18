@@ -5,6 +5,7 @@ icon: Package
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
 
 ## Install
 
@@ -18,18 +19,20 @@ That's it. No config files, no providers, no boilerplate.
 
 ## Package Exports
 
-Stunk ships three importable paths:
+Stunk ships four importable paths:
 
-| Import             | Description                                                                            |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| `stunk`            | Core state management — `chunk`, `computed`, `asyncChunk`, `batch`, and more           |
-| `stunk/react`      | React hooks — `useChunk`, `useChunkValue`, `useDerive`, `useComputed`, `useAsyncChunk` |
-| `stunk/middleware` | Middleware utilities — `logger`, `persist`, and custom middleware helpers              |
+| Import             | Description                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `stunk`            | Core — `chunk`, `computed`, `select`, `batch`, `isChunk` and more                   |
+| `stunk/react`      | React hooks — `useChunk`, `useChunkValue`, `useAsyncChunk`, `useInfiniteAsyncChunk` |
+| `stunk/query`      | Async layer — `asyncChunk`, `infiniteAsyncChunk`, `combineAsyncChunks`              |
+| `stunk/middleware` | Middleware — `history`, `persist`, `logger`, `nonNegativeValidator`                 |
 
 ```ts
-import { chunk } from "stunk";
-import { useChunk } from "stunk/react";
-import { logger } from "stunk/middleware";
+import { chunk, computed } from "stunk";
+import { useChunk, useAsyncChunk } from "stunk/react";
+import { asyncChunk, infiniteAsyncChunk } from "stunk/query";
+import { history, persist, logger } from "stunk/middleware";
 ```
 
 ---
@@ -93,6 +96,16 @@ const user = chunk({ name: "Fola", age: 25 }); // Chunk<{ name: string; age: num
 count.set("hello"); // ❌ Argument of type 'string' is not assignable to 'number'
 ```
 
+You can also opt into **strict mode** to catch accidental shape mutations at runtime in development:
+
+```ts
+const user = chunk({ name: "Fola", age: 25 }, { strict: true });
+
+// In development — throws immediately:
+user.set({ name: "Fola", age: 25, role: "admin" });
+// 🚨 Stunk: [chunk_0] Unexpected keys in set(): role.
+```
+
 ---
 
 ## Requirements
@@ -113,10 +126,6 @@ count.set("hello"); // ❌ Argument of type 'string' is not assignable to 'numbe
 ---
 
 ## What's next?
-
-Now that you have Stunk installed, learn about the core primitive — **chunks**:
-
-import { Cards, Card } from "fumadocs-ui/components/card";
 
 <Cards>
   <Card
