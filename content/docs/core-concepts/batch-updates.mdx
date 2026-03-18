@@ -7,9 +7,9 @@ icon: Layers
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-By default, every `set()` call immediately notifies all subscribers. If you update multiple chunks at once, each update triggers a separate notification — which means a separate re-render per chunk.
+By default, every `set()` call immediately notifies all subscribers. Updating multiple chunks at once triggers a separate notification per chunk — meaning a separate re-render per chunk in React.
 
-`batch()` solves this by grouping all updates inside a callback into a **single notification cycle**. All chunks are updated first, then all subscribers are notified once.
+`batch()` solves this by collecting all updates inside a callback and firing a **single notification** after all of them complete.
 
 ```ts
 import { chunk, batch } from "stunk";
@@ -35,20 +35,18 @@ batch(() => {
 
 ## How it works
 
-When `batch()` runs:
-
 1. A batching flag is set internally
-2. Every `set()` call marks the chunk as "dirty" instead of notifying immediately
-3. After the callback finishes, all dirty chunks notify their subscribers at once
+2. Every `set()` inside the callback marks the chunk as dirty instead of notifying immediately
+3. After the callback completes, all dirty chunks notify their subscribers once with the final value
 4. The batching flag is cleared
 
-This means subscribers only receive one update per batch, with the **final value** after all mutations.
+Subscribers always receive the **final value** after all mutations — intermediate values are never seen.
 
 ---
 
-## With React
+## In React
 
-In React, each chunk update that triggers a re-render is expensive. `batch()` is especially useful when updating multiple related chunks that feed into the same component:
+`batch()` is especially useful when updating multiple related chunks that feed into the same component:
 
 ```tsx
 import { chunk, batch } from "stunk";
@@ -62,11 +60,11 @@ function NameForm() {
   const [last, setLast] = useChunk(lastName);
 
   const handleReset = () => {
-    // Component re-renders once, not twice
     batch(() => {
       setFirst("Fola");
       setLast("Ade");
     });
+    // component re-renders once, not twice
   };
 
   return (
@@ -81,27 +79,27 @@ function NameForm() {
 ```
 
 <Callout type="info">
-  React 18 automatically batches state updates in event handlers via automatic
-  batching. `batch()` is still useful for updates outside of React events —
-  timeouts, async callbacks, or vanilla JS code.
+  React 18 automatically batches state updates inside event handlers. `batch()`
+  is still useful for updates outside React events — timeouts, async callbacks,
+  or vanilla JS code.
 </Callout>
 
 ---
 
 ## Nested batches
 
-`batch()` calls can be nested safely. The outer batch controls when notifications fire — inner batches don't trigger early notifications.
+`batch()` calls can be nested safely. The outermost batch controls when notifications fire — inner batches don't flush early.
 
 ```ts
 batch(() => {
   firstName.set("Tunde");
 
   batch(() => {
-    lastName.set("Bello"); // still batched by outer
+    lastName.set("Bello");
     age.set(30);
   });
 
-  // notifications still haven't fired
+  // still batched — no notifications yet
 });
 // all three notify here, once
 ```
@@ -110,19 +108,34 @@ batch(() => {
 
 ## With computed chunks
 
-`batch()` works correctly with `computed()` — the computed value is recalculated after all source chunks have been updated, not after each individual update:
+`batch()` works correctly with `computed()` — the computed value recomputes after all source chunks have been updated:
 
 ```ts
 const price = chunk(100);
 const quantity = chunk(3);
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
 batch(() => {
   price.set(50);
   quantity.set(10);
 });
 
-total.get(); // 500 — computed once after both updates
+total.get(); // 500 — computed once after both updates, not twice
+```
+
+---
+
+## Error safety
+
+If an error is thrown inside a `batch()` callback, the batch still flushes any updates that completed before the error:
+
+```ts
+batch(() => {
+  count.set(1); // this runs
+  throw new Error("oops");
+  count.set(2); // unreachable
+});
+// count is 1, subscribers notified
 ```
 
 ---
