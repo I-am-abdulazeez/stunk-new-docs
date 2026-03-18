@@ -99,12 +99,16 @@ const persisted = persist(lastVisited, {
 
 ## SSR safety
 
-`persist` uses `localStorage` by default which is only available in browsers. In SSR environments, `persist` detects this automatically, logs a warning, and returns the base chunk unchanged — no crash, no side effects.
+`persist` detects server environments automatically — if `localStorage` is not available, it logs a warning and returns the base chunk unchanged. No crash, no setup needed.
 
-<Callout type="warn">
-  If you need persistence in SSR, pass a custom `storage` implementation that
-  works server-side, or guard the call with `typeof window !== 'undefined'`.
-</Callout>
+If you want persistence in SSR, pass a custom `storage` implementation that works server-side:
+
+```ts
+const persisted = persist(theme, {
+  key: "app-theme",
+  storage: myServerSideStorage,
+});
+```
 
 ---
 
