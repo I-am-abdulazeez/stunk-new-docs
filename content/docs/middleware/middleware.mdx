@@ -13,16 +13,18 @@ Middleware lets you intercept every `set()` call on a chunk and transform, valid
 
 ## How it works
 
-Middleware is passed as the second argument to `chunk()` — an array of functions that run in order on every `set()` call. Each middleware receives the incoming value and returns a (possibly transformed) value. If a middleware returns `undefined`, the chain stops and no update is applied.
+Middleware is passed inside the config object as the second argument to `chunk()`. Each function runs in order on every `set()` call, receives the incoming value, and returns a (possibly transformed) value. If any middleware returns `undefined`, the chain stops and no update is applied.
 
 ```ts
 import { chunk } from "stunk";
 import { logger, nonNegativeValidator } from "stunk/middleware";
 
-const count = chunk(0, [logger, nonNegativeValidator]);
+const count = chunk(0, {
+  middleware: [logger(), nonNegativeValidator],
+});
 
-count.set(5); // logs "Setting value: 5" → valid, applies
-count.set(-1); // logs "Setting value: -1" → throws "Value must be non-negative!"
+count.set(5); // logs "Setting value: 5" → applies
+count.set(-1); // throws "Value must be non-negative!"
 ```
 
 Middleware runs **before** the value is stored. If any middleware throws, the chunk value is not updated.
@@ -31,97 +33,98 @@ Middleware runs **before** the value is stored. If any middleware throws, the ch
 
 ## Built-in middleware
 
-### `logger`
+### `logger()`
 
-Logs every `set()` call to the console. Useful during development to trace state changes.
+Logs every `set()` call to the console. Called as a factory — `logger()` not `logger`.
 
 ```ts
 import { chunk } from "stunk";
 import { logger } from "stunk/middleware";
 
-const count = chunk(0, [logger]);
+const count = chunk(0, { middleware: [logger()] });
 
 count.set(10); // console: "Setting value: 10"
 ```
 
 ### `nonNegativeValidator`
 
-Throws if the incoming value is negative. Only works on `Chunk<number>`.
+Throws if the incoming value is negative. Used directly — not a factory.
 
 ```ts
 import { chunk } from "stunk";
 import { nonNegativeValidator } from "stunk/middleware";
 
-const score = chunk(0, [nonNegativeValidator]);
+const score = chunk(0, { middleware: [nonNegativeValidator] });
 
 score.set(100); // ✅
 score.set(-5); // ❌ throws "Value must be non-negative!"
 ```
 
 <Callout type="info">
-  `logger` and `nonNegativeValidator` are **chunk middleware** — they're passed
-  directly to `chunk()`. `withHistory` and `withPersistence` are different —
-  they wrap a chunk after creation. See their dedicated pages for details.
+  `logger` and `nonNegativeValidator` are **chunk middleware** — passed inside
+  `chunk()` config. `history` and `persist` are different — they wrap a chunk
+  after creation. See their dedicated pages for details.
 </Callout>
 
 ---
 
 ## Writing your own middleware
 
-A middleware is just a function that receives a value and returns a value:
+A middleware is a function that receives a value and returns a value:
 
 ```ts
-import { Middleware } from "stunk";
+import type { Middleware } from "stunk";
 
 const clamp =
   (min: number, max: number): Middleware<number> =>
-  (value) => {
-    return Math.min(Math.max(value, min), max);
-  };
+  (value) =>
+    Math.min(Math.max(value, min), max);
 
-const volume = chunk(50, [clamp(0, 100)]);
+const volume = chunk(50, { middleware: [clamp(0, 100)] });
 
 volume.set(150); // clamped to 100
 volume.set(-10); // clamped to 0
 ```
 
-You can also use the named middleware format for better error messages:
+Use the named format for better dev-mode error messages:
 
 ```ts
-const count = chunk(0, [
-  { name: "logger", fn: logger },
-  { name: "clamp", fn: clamp(0, 100) },
-]);
+const count = chunk(0, {
+  middleware: [
+    { name: "logger", fn: logger() },
+    { name: "clamp", fn: clamp(0, 100) },
+  ],
+});
 ```
 
 ### Stopping the chain
 
-Return `undefined` to stop the middleware chain and skip the update entirely:
+Return `undefined` to stop the chain and skip the update entirely:
 
 ```ts
 const noZero: Middleware<number> = (value) => {
-  if (value === 0) return undefined; // skip the update
+  if (value === 0) return undefined; // skip
   return value;
 };
 
-const count = chunk(1, [noZero]);
+const count = chunk(1, { middleware: [noZero] });
 count.set(0); // no update, value stays 1
 ```
 
 ### Transforming values
 
-Middleware can return a modified value — not just validate:
+Middleware can return a modified value:
 
 ```ts
 const uppercase: Middleware<string> = (value) => value.toUpperCase();
 
-const name = chunk("fola", [uppercase]);
+const name = chunk("fola", { middleware: [uppercase] });
 name.set("tunde"); // stored as "TUNDE"
 ```
 
 ### Async middleware
 
-Middleware is synchronous by design. For async side effects (e.g. logging to a server), use `subscribe()` instead:
+Middleware is synchronous by design. For async side effects use `subscribe()` instead:
 
 ```ts
 count.subscribe(async (value) => {
@@ -131,16 +134,18 @@ count.subscribe(async (value) => {
 
 ---
 
-## Middleware execution order
+## Execution order
 
 Middleware runs left to right. Each receives the output of the previous:
 
 ```ts
-const count = chunk(0, [
-  middlewareA, // runs first
-  middlewareB, // receives output of A
-  middlewareC, // receives output of B
-]);
+const count = chunk(0, {
+  middleware: [
+    middlewareA, // runs first
+    middlewareB, // receives output of A
+    middlewareC, // receives output of B
+  ],
+});
 ```
 
 If any middleware throws, the chain stops and the chunk is not updated.
@@ -151,12 +156,12 @@ If any middleware throws, the chain stops and the chunk is not updated.
 
 <Cards>
   <Card
-    title="withHistory"
+    title="history"
     description="Undo and redo state changes with built-in history tracking"
     href="/docs/middleware/with-history"
   />
   <Card
-    title="withPersistence"
+    title="persist"
     description="Persist chunk state to localStorage or any Storage API"
     href="/docs/middleware/with-persistence"
   />
