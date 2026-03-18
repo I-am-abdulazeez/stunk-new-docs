@@ -6,7 +6,7 @@ description: Use Stunk without any framework — pure reactive state in plain Ja
 import { Callout } from "fumadocs-ui/components/callout";
 import { Cards, Card } from "fumadocs-ui/components/card";
 
-Stunk has zero dependencies and no framework requirements. Everything works in plain JavaScript or TypeScript — `chunk`, `computed`, `select`, `batch`, `asyncChunk`, and all middleware.
+Stunk has zero dependencies and no framework requirements. Everything works in plain JavaScript or TypeScript — `chunk`, `computed`, `select`, `batch`, and all middleware.
 
 ---
 
@@ -17,14 +17,10 @@ import { chunk } from "stunk";
 
 const count = chunk(0);
 
-// Read
 count.get(); // 0
-
-// Write
+count.peek(); // read without tracking
 count.set(1);
 count.set((prev) => prev + 1);
-
-// Reset
 count.reset();
 ```
 
@@ -32,7 +28,7 @@ count.reset();
 
 ## Subscribing to changes
 
-`subscribe` is the core reactivity primitive. The callback fires immediately with the current value, then on every subsequent change. It returns an unsubscribe function.
+`subscribe()` fires on every change — not on initial subscribe. Returns an unsubscribe function.
 
 ```ts
 const count = chunk(0);
@@ -44,9 +40,13 @@ const unsubscribe = count.subscribe((value) => {
 count.set(1); // DOM updates
 count.set(2); // DOM updates
 
-// Stop listening
 unsubscribe();
 ```
+
+<Callout type="info">
+  In v3, `subscribe()` no longer fires immediately with the current value on
+  registration. Call `chunk.get()` directly for the initial value.
+</Callout>
 
 ---
 
@@ -62,7 +62,7 @@ discounted.subscribe((value) => {
   document.querySelector("#price").textContent = `$${value}`;
 });
 
-price.set(200); // discounted updates to 180, DOM updates
+price.set(200); // discounted → 180, DOM updates
 ```
 
 ---
@@ -73,14 +73,12 @@ price.set(200); // discounted updates to 180, DOM updates
 import { chunk, select } from "stunk";
 
 const user = chunk({ name: "Fola", age: 25, role: "admin" });
-
 const userName = select(user, (u) => u.name);
 
 userName.subscribe((name) => {
   document.querySelector("#name").textContent = name;
 });
 
-// Only triggers when name changes, not age or role
 user.set((prev) => ({ ...prev, age: 26 })); // no DOM update
 user.set((prev) => ({ ...prev, name: "Tunde" })); // DOM updates
 ```
@@ -94,7 +92,7 @@ import { chunk, computed } from "stunk";
 
 const price = chunk(100);
 const quantity = chunk(3);
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
 total.subscribe((value) => {
   document.querySelector("#total").textContent = `$${value}`;
@@ -108,17 +106,11 @@ quantity.set(10); // total → 500
 
 ## Batch updates
 
-Group multiple updates to avoid redundant subscriber notifications:
-
 ```ts
 import { chunk, batch } from "stunk";
 
 const firstName = chunk("Fola");
 const lastName = chunk("Ade");
-
-// Without batch — two notifications
-firstName.set("Tunde");
-lastName.set("Bello");
 
 // With batch — one notification after both updates
 batch(() => {
@@ -132,7 +124,7 @@ batch(() => {
 ## Async state
 
 ```ts
-import { asyncChunk } from "stunk";
+import { asyncChunk } from "stunk/query";
 
 const postsChunk = asyncChunk(async () => {
   const res = await fetch("/api/posts");
@@ -153,7 +145,6 @@ postsChunk.subscribe(({ loading, error, data }) => {
     .join("");
 });
 
-// Refetch manually
 document.querySelector("#reload").addEventListener("click", () => {
   postsChunk.reload();
 });
@@ -167,7 +158,9 @@ document.querySelector("#reload").addEventListener("click", () => {
 import { chunk } from "stunk";
 import { logger, nonNegativeValidator } from "stunk/middleware";
 
-const score = chunk(0, [logger, nonNegativeValidator]);
+const score = chunk(0, {
+  middleware: [logger(), nonNegativeValidator],
+});
 
 score.set(10); // logs and applies
 score.set(-1); // throws, value unchanged
@@ -175,51 +168,51 @@ score.set(-1); // throws, value unchanged
 
 ---
 
-## withHistory
+## history
 
 ```ts
 import { chunk } from "stunk";
-import { withHistory } from "stunk/middleware";
+import { history } from "stunk/middleware";
 
 const text = chunk("");
-const editor = withHistory(text);
+const editor = history(text);
 
 editor.set("Hello");
 editor.set("Hello World");
 
 editor.undo(); // "Hello"
 editor.redo(); // "Hello World"
+editor.reset(); // "" — clears history too
 ```
 
 ---
 
-## withPersistence
+## persist
 
 ```ts
 import { chunk } from "stunk";
-import { withPersistence } from "stunk/middleware";
+import { persist } from "stunk/middleware";
 
 const theme = chunk<"light" | "dark">("light");
-const persistedTheme = withPersistence(theme, { key: "app-theme" });
+const persistedTheme = persist(theme, { key: "app-theme" });
 
-persistedTheme.set("dark");
-// saved to localStorage
-
+persistedTheme.set("dark"); // saved to localStorage
 // Next page load — automatically restored to "dark"
+
+persistedTheme.clearStorage(); // remove from localStorage
 ```
 
 ---
 
 ## Cleanup
 
-Always call `destroy()` when a chunk is no longer needed to clear subscribers and free memory:
+Call `destroy()` when a chunk is no longer needed:
 
 ```ts
 const count = chunk(0);
-const sub = count.subscribe(console.log);
+count.subscribe(console.log);
 
-// When done
-count.destroy(); // clears all subscribers and removes from registry
+count.destroy(); // clears all subscribers
 ```
 
 <Callout type="info">
