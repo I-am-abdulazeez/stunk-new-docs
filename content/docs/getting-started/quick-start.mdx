@@ -41,23 +41,18 @@ Chunks are defined **outside** components or functions — they are global react
 
 ## Read and update state
 
-Every chunk has `get()`, `set()`, and `reset()` methods.
+Every chunk has `get()`, `peek()`, `set()`, and `reset()` methods.
 
 ```ts
-// Read the current value
-count.get(); // 0
+count.get(); // 0 — read and track as dependency
+count.peek(); // 0 — read without tracking
 
-// Set a new value directly
-count.set(10);
-
-// Update based on the previous value
-count.set((prev) => prev + 1); // 11
-
-// Reset back to the initial value
-count.reset(); // 0
+count.set(10); // set directly
+count.set((prev) => prev + 1); // update from previous value → 11
+count.reset(); // back to initial value → 0
 ```
 
-`set()` accepts either a new value or an updater function — no separate `update()` needed.
+Use `peek()` when you need the current value but don't want it to trigger recomputes in `computed()` or derived state.
 
 </Step>
 
@@ -91,7 +86,6 @@ Import `useChunk` from `stunk/react` to bind a chunk to a React component:
 import { chunk } from "stunk";
 import { useChunk } from "stunk/react";
 
-// Define state outside the component
 const counter = chunk(0);
 
 function Counter() {
@@ -120,14 +114,14 @@ Derive a new reactive value from an existing chunk using `.derive()`:
 ```ts
 const price = chunk(100);
 
-// Automatically updates when price changes
 const discounted = price.derive((p) => p * 0.9);
 
 price.set(200);
 discounted.get(); // 180
 ```
 
-For deriving from **multiple chunks**, use `computed()`:
+For deriving from **multiple chunks**, use `computed()`. In v3, dependencies are
+tracked automatically — just call `.get()` on any chunk inside the function:
 
 ```ts
 import { chunk, computed } from "stunk";
@@ -135,13 +129,19 @@ import { chunk, computed } from "stunk";
 const price = chunk(100);
 const quantity = chunk(3);
 
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
 total.get(); // 300
 
 quantity.set(5);
 total.get(); // 500 — automatically recomputed
 ```
+
+<Callout type="info">
+  No dependency arrays. `computed()` tracks any chunk whose `.get()` is called
+  during execution. Use `.peek()` to read a value without registering it as a
+  dependency.
+</Callout>
 
 </Step>
 
@@ -151,22 +151,20 @@ total.get(); // 500 — automatically recomputed
 
 ## Putting it all together
 
-Here's a complete example combining chunks, derived state, and React hooks:
+Here's a complete example combining chunks, computed state, and React hooks:
 
 ```tsx
 import { chunk, computed } from "stunk";
-import { useChunk, useComputed } from "stunk/react";
+import { useChunk, useChunkValue } from "stunk/react";
 
-// State
 const price = chunk(50);
 const quantity = chunk(2);
 
-// Derived
-const total = computed([price, quantity], (p, q) => p * q);
+const total = computed(() => price.get() * quantity.get());
 
 function Cart() {
   const [qty, setQty] = useChunk(quantity);
-  const totalValue = useComputed([price, quantity], (p, q) => p * q);
+  const totalValue = useChunkValue(total);
 
   return (
     <div>
