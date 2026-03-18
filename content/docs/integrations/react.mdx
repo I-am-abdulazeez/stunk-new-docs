@@ -27,7 +27,7 @@ The primary hook for reading and writing a chunk. Returns `[value, set, reset, d
 import { chunk } from "stunk";
 import { useChunk } from "stunk/react";
 
-const count = chunk(0);
+const counter = chunk(0);
 
 function Counter() {
   const [count, setCount, resetCount] = useChunk(counter);
@@ -44,7 +44,7 @@ function Counter() {
 
 ### With a selector
 
-`useChunk` accepts an optional selector to subscribe to a slice of the value. The component only re-renders when the selected slice changes:
+Pass an optional selector to subscribe to a slice of the value. The component only re-renders when the selected slice changes:
 
 ```tsx
 const user = chunk({ name: "Fola", age: 25, role: "admin" });
@@ -72,7 +72,7 @@ const [value, set, reset, destroy] = useChunk(chunk, selector?);
 
 ## `useChunkValue`
 
-Read-only version of `useChunk`. Use this when a component only needs to read a value — no setter needed.
+Read-only version of `useChunk`. Use this when a component only needs to read — no setter needed.
 
 ```tsx
 import { useChunkValue } from "stunk/react";
@@ -81,7 +81,6 @@ const theme = chunk<"light" | "dark">("light");
 
 function ThemeDisplay() {
   const currentTheme = useChunkValue(theme);
-
   return <p>Theme: {currentTheme}</p>;
 }
 ```
@@ -93,21 +92,27 @@ const user = chunk({ name: "Fola", age: 25 });
 
 function UserAge() {
   const age = useChunkValue(user, (u) => u.age);
-
   return <p>Age: {age}</p>;
 }
 ```
 
-This is the preferred hook for derived chunks, computed chunks, and selectors — since those are all read-only:
+This is the preferred hook for derived chunks, computed chunks, and selectors:
 
 ```tsx
 const price = chunk(100);
+const quantity = chunk(3);
+const total = computed(() => price.get() * quantity.get());
 const discounted = price.derive((p) => p * 0.9);
 
-function DiscountedPrice() {
-  const value = useChunkValue(discounted);
+function Summary() {
+  const totalValue = useChunkValue(total);
+  const discountedValue = useChunkValue(discounted);
 
-  return <p>Discounted: ${value}</p>;
+  return (
+    <p>
+      Total: ${totalValue} (discounted: ${discountedValue})
+    </p>
+  );
 }
 ```
 
@@ -118,7 +123,7 @@ function DiscountedPrice() {
 Subscribes to an async chunk and returns its full state with all async methods.
 
 ```tsx
-import { asyncChunk } from "stunk";
+import { asyncChunk } from "stunk/query";
 import { useAsyncChunk } from "stunk/react";
 
 const postsChunk = asyncChunk(async () => {
@@ -147,24 +152,33 @@ function PostList() {
 }
 ```
 
+### Options
+
+| Option          | Type         | Description                                |
+| --------------- | ------------ | ------------------------------------------ |
+| `initialParams` | `Partial<P>` | Params to pass to the fetcher on mount     |
+| `fetchOnMount`  | `boolean`    | Force fetch on mount for param-less chunks |
+
 ### Return value
 
-|                   | Type                         | Description                                           |
-| ----------------- | ---------------------------- | ----------------------------------------------------- |
-| `data`            | `T \| null`                  | Resolved data                                         |
-| `loading`         | `boolean`                    | `true` while fetching                                 |
-| `error`           | `E \| null`                  | Error from last failed fetch                          |
-| `lastFetched`     | `number \| undefined`        | Timestamp of last successful fetch                    |
-| `reload`          | `(params?) => Promise<void>` | Force refetch                                         |
-| `refresh`         | `(params?) => Promise<void>` | Refetch if stale                                      |
-| `mutate`          | `(mutator) => void`          | Update data directly                                  |
-| `reset`           | `() => void`                 | Reset to initial state                                |
-| `setParams`       | `(params) => void`           | Update params and refetch _(if chunk accepts params)_ |
-| `pagination`      | `PaginationState`            | Current pagination state _(if paginated chunk)_       |
-| `nextPage`        | `() => Promise<void>`        | Load next page _(if paginated chunk)_                 |
-| `prevPage`        | `() => Promise<void>`        | Load previous page _(if paginated chunk)_             |
-| `goToPage`        | `(page) => Promise<void>`    | Jump to a page _(if paginated chunk)_                 |
-| `resetPagination` | `() => Promise<void>`        | Reset to page 1 _(if paginated chunk)_                |
+|                     | Type                         | Description                                              |
+| ------------------- | ---------------------------- | -------------------------------------------------------- |
+| `data`              | `T \| null`                  | Resolved data                                            |
+| `loading`           | `boolean`                    | `true` while fetching                                    |
+| `error`             | `E \| null`                  | Error from last failed fetch                             |
+| `lastFetched`       | `number \| undefined`        | Timestamp of last successful fetch                       |
+| `isPlaceholderData` | `boolean`                    | `true` when showing stale data during refetch            |
+| `reload`            | `(params?) => Promise<void>` | Force refetch                                            |
+| `refresh`           | `(params?) => Promise<void>` | Refetch if stale                                         |
+| `mutate`            | `(mutator) => void`          | Update data directly                                     |
+| `reset`             | `() => void`                 | Reset to initial state                                   |
+| `setParams`         | `(params) => void`           | Update params and refetch _(if chunk accepts params)_    |
+| `clearParams`       | `() => void`                 | Clear all params and refetch _(if chunk accepts params)_ |
+| `pagination`        | `PaginationState`            | Current pagination state _(if paginated)_                |
+| `nextPage`          | `() => Promise<void>`        | Load next page _(if paginated)_                          |
+| `prevPage`          | `() => Promise<void>`        | Load previous page _(if paginated)_                      |
+| `goToPage`          | `(page) => Promise<void>`    | Jump to a page _(if paginated)_                          |
+| `resetPagination`   | `() => Promise<void>`        | Reset to page 1 _(if paginated)_                         |
 
 <Callout type="info">
   `useAsyncChunk` automatically calls `cleanup()` when the component unmounts —
@@ -175,10 +189,10 @@ function PostList() {
 
 ## `useInfiniteAsyncChunk`
 
-Wraps `useAsyncChunk` for infinite scroll. Attach the returned `observerTarget` ref to a sentinel element at the bottom of your list and the hook handles the rest.
+Wraps `useAsyncChunk` for infinite scroll. Attach `observerTarget` to a sentinel element at the bottom of your list — the hook handles intersection observation automatically.
 
 ```tsx
-import { infiniteAsyncChunk } from "stunk";
+import { infiniteAsyncChunk } from "stunk/query";
 import { useInfiniteAsyncChunk } from "stunk/react";
 
 const postsChunk = infiniteAsyncChunk(
@@ -229,70 +243,11 @@ function PostFeed() {
 
 ---
 
-## Deprecated in v2, removed in v3
-
-The following hooks exist in v2 but will be **removed in v3**. Stop using them now and migrate to the patterns below.
-
-### `useDerive` → use `useChunkValue`
-
-```tsx
-// ❌ v2 — deprecated
-const doubled = useDerive(count, (n) => n * 2);
-
-// ✅ v3 — derive outside, read with useChunkValue
-const doubled = count.derive((n) => n * 2);
-function Component() {
-  const value = useChunkValue(doubled);
-}
-```
-
-### `useComputed` → use `useChunkValue`
-
-```tsx
-// ❌ v2 — deprecated
-const total = useComputed([price, qty], (p, q) => p * q);
-
-// ✅ v3 — compute outside, read with useChunkValue
-const total = computed([price, qty], (p, q) => p * q);
-function Component() {
-  const value = useChunkValue(total);
-}
-```
-
-### `useChunkProperty` → use `useChunkValue` with a selector
-
-```tsx
-// ❌ v2 — deprecated
-const name = useChunkProperty(user, "name");
-
-// ✅ v3 — just use a selector
-const name = useChunkValue(user, (u) => u.name);
-```
-
-### `useChunkValues` → use `useChunkValue` per chunk
-
-```tsx
-// ❌ v2 — deprecated, subtle pitfalls with inline arrays
-const [price, qty] = useChunkValues([priceChunk, qtyChunk]);
-
-// ✅ v3 — explicit and clear
-const price = useChunkValue(priceChunk);
-const qty = useChunkValue(qtyChunk);
-```
-
-<Callout type="warn">
-  All four deprecated hooks will be **removed in v3** with no replacement other
-  than the patterns shown above. Migrating now will make your v3 upgrade a
-  non-event.
-</Callout>
-
----
-
 ## Summary
 
-| Hook                    | Use case                                    |
-| ----------------------- | ------------------------------------------- |
-| `useChunk`              | Read + write a chunk                        |
-| `useChunkValue`         | Read-only, also for derived/computed/select |
-| `useAsyncChunk`         | Async state with loading/error/data         |
-| `useInfiniteAsyncChunk` | Infinite scroll with auto-load              |
+| Hook                    | Use case                                     |
+| ----------------------- | -------------------------------------------- |
+| `useChunk`              | Read + write a chunk                         |
+| `useChunkValue`         | Read-only — also for derived/computed/select |
+| `useAsyncChunk`         | Async state with loading/error/data          |
+| `useInfiniteAsyncChunk` | Infinite scroll with auto-load               |
