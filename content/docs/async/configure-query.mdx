@@ -1,0 +1,151 @@
+---
+title: Configure Query
+description: Set global defaults for all async chunks and mutations.
+icon: Settings
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`configureQuery()` sets global defaults that apply to every `asyncChunk` and `mutation` in your app. Per-chunk and per-mutation options always override these defaults.
+
+```ts
+import { configureQuery } from "stunk/query";
+
+configureQuery({
+  query: {
+    staleTime: 30_000,
+    retryCount: 3,
+    refetchOnWindowFocus: true,
+    onError: (err) => toast.error(err.message),
+    onSuccess: (data) => analytics.track("fetch_success"),
+  },
+  mutation: {
+    onError: (err) => toast.error(err.message),
+    onSuccess: () => toast.success("Done!"),
+  },
+});
+```
+
+<Callout type="warn">
+  Call `configureQuery()` once at app entry — before any `asyncChunk` or
+  `mutation` is created. Chunks read global config at creation time.
+</Callout>
+
+---
+
+## Options
+
+### `query`
+
+Defaults applied to all `asyncChunk` instances:
+
+| Option                 | Type              | Default   | Description                              |
+| ---------------------- | ----------------- | --------- | ---------------------------------------- |
+| `staleTime`            | `number`          | `0`       | ms before data is considered stale       |
+| `cacheTime`            | `number`          | `300_000` | ms to cache after last subscriber leaves |
+| `refetchInterval`      | `number`          | —         | Auto-refetch interval in ms              |
+| `refetchOnWindowFocus` | `boolean`         | `false`   | Refetch when window regains focus        |
+| `retryCount`           | `number`          | `0`       | Retries on failure                       |
+| `retryDelay`           | `number`          | `1000`    | ms between retries                       |
+| `onError`              | `(error) => void` | —         | Called when all retries are exhausted    |
+| `onSuccess`            | `(data) => void`  | —         | Called after every successful fetch      |
+
+### `mutation`
+
+Defaults applied to all `mutation` instances:
+
+| Option      | Type              | Description                      |
+| ----------- | ----------------- | -------------------------------- |
+| `onError`   | `(error) => void` | Called on mutation failure       |
+| `onSuccess` | `(data) => void`  | Called after successful mutation |
+
+---
+
+## Per-chunk override
+
+Per-chunk options always take precedence over global defaults:
+
+```ts
+configureQuery({ query: { retryCount: 3 } });
+
+// This chunk retries once — overrides the global 3
+const userChunk = asyncChunk(fetchUser, { retryCount: 1 });
+
+// This chunk uses the global 3
+const postsChunk = asyncChunk(fetchPosts);
+```
+
+---
+
+## Query and mutation independently
+
+Both `query` and `mutation` are fully optional — configure only what you need:
+
+```ts
+// Only configure query defaults
+configureQuery({
+  query: { staleTime: 60_000, retryCount: 2 },
+});
+
+// Only configure mutation defaults
+configureQuery({
+  mutation: { onError: (err) => logger.error(err) },
+});
+```
+
+---
+
+## In React apps
+
+Call once at app entry before rendering:
+
+```ts
+// main.ts / index.ts
+import { configureQuery } from "stunk/query";
+
+configureQuery({
+  query: {
+    staleTime: 30_000,
+    onError: (err) => toast.error(err.message),
+  },
+  mutation: {
+    onError: (err) => toast.error(err.message),
+  },
+});
+
+// Then render your app
+ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+```
+
+---
+
+## Testing
+
+Use `resetQueryConfig()` in `afterEach` to prevent config bleed between tests:
+
+```ts
+import { resetQueryConfig } from "stunk/query";
+import { afterEach } from "vitest";
+
+afterEach(() => {
+  resetQueryConfig();
+});
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Async Chunk"
+    description="Reactive async state for data fetching"
+    href="/docs/async/async-chunk"
+  />
+  <Card
+    title="Mutation"
+    description="Reactive mutations with automatic cache invalidation"
+    href="/docs/async/mutation"
+  />
+</Cards>
