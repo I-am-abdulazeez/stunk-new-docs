@@ -1,0 +1,216 @@
+---
+title: Mutation
+description: Reactive mutations for POST, PUT, DELETE and any async side effect.
+icon: Pencil
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+
+`mutation()` wraps an async side effect and gives you reactive `loading`, `error`, `data`, and `isSuccess` states. Unlike `asyncChunk`, mutations are imperative — they don't fetch automatically. You call `mutate()` when you're ready.
+
+```ts
+import { mutation } from "stunk/query";
+
+const createPost = mutation(
+  async (data: NewPost) => {
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+  {
+    invalidates: [postsChunk],
+    onSuccess: (data) => toast.success("Post created!"),
+    onError: (err) => toast.error(err.message),
+  },
+);
+```
+
+---
+
+## State shape
+
+| Property    | Type        | Description                                                                              |
+| ----------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `loading`   | `boolean`   | `true` while the mutation is in progress                                                 |
+| `data`      | `T \| null` | Data returned from the last successful mutation, or `null`                               |
+| `error`     | `E \| null` | Error from the last failed mutation, or `null`                                           |
+| `isSuccess` | `boolean`   | `true` after a successful mutation — distinct from `data` which can be `null` on success |
+
+---
+
+## Options
+
+| Option        | Type                                                        | Description                                                |
+| ------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `invalidates` | `AsyncChunk[]`                                              | Chunks to reload automatically after a successful mutation |
+| `onSuccess`   | `(data: T, variables: V) => void`                           | Called after a successful mutation                         |
+| `onError`     | `(error: E, variables: V) => void`                          | Called on failure                                          |
+| `onSettled`   | `(data: T \| null, error: E \| null, variables: V) => void` | Called after every attempt regardless of outcome           |
+
+<Callout type="info">
+  `onSuccess` and `onError` can be set globally via `configureQuery({ mutation: {} })`.
+  Per-mutation options always override global defaults.
+</Callout>
+
+---
+
+## `mutate()`
+
+Executes the mutation. Always returns a resolved promise — never throws. Safe to fire and forget, or await for local UI control:
+
+```ts
+// Fire and forget — safe, errors handled by onError
+createPost.mutate({ title: "Hello" });
+
+// Await — no try/catch needed
+const { data, error } = await createPost.mutate({ title: "Hello" });
+if (!error) router.push("/posts");
+```
+
+---
+
+## `invalidates`
+
+Pass an array of `AsyncChunk` instances. After a successful mutation, Stunk calls `.reload()` on each of them concurrently — no query keys, no `queryClient`, no `Promise.all` needed:
+
+```ts
+const createPost = mutation(createPostFn, {
+  invalidates: [postsChunk, dashboardChunk],
+});
+
+// After mutate() succeeds — postsChunk and dashboardChunk both reload automatically
+```
+
+<Callout type="info">
+  `invalidates` only fires on success. A failed mutation leaves all chunks
+  untouched.
+</Callout>
+
+---
+
+## `onSettled`
+
+Called after every attempt — success or failure. Useful for unconditional cleanup like hiding a spinner or closing a modal:
+
+```ts
+const deletePost = mutation(deletePostFn, {
+  onSettled: () => setModalOpen(false), // always close the modal
+});
+```
+
+---
+
+## `get()` and `subscribe()`
+
+Mutation state is fully reactive — use `get()` to read it directly, or `subscribe()` to react to changes outside React:
+
+```ts
+createPost.get(); // { loading, data, error, isSuccess }
+
+const unsub = createPost.subscribe((state) => {
+  if (state.isSuccess) analytics.track("post_created");
+});
+```
+
+---
+
+## `reset()`
+
+Clears `data`, `error`, and `isSuccess` back to initial state:
+
+```ts
+createPost.reset();
+createPost.get(); // { loading: false, data: null, error: null, isSuccess: false }
+```
+
+---
+
+## In React
+
+Use `useMutation` to consume mutation state reactively in a component:
+
+```tsx
+import { mutation } from "stunk/query";
+import { useMutation } from "stunk/react";
+
+const createPost = mutation(
+  async (data: NewPost) => fetchAPI("/posts", { method: "POST", body: data }),
+  { invalidates: [postsChunk] },
+);
+
+function CreatePostForm() {
+  const { mutate, loading, error, isSuccess } = useMutation(createPost);
+
+  const handleSubmit = async (formData: NewPost) => {
+    const { error } = await mutate(formData);
+    if (!error) router.push("/posts");
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit(getFormData(e));
+      }}
+    >
+      {error && <p>Error: {error.message}</p>}
+      {isSuccess && <p>Post created!</p>}
+      <button type="submit" disabled={loading}>
+        {loading ? "Creating..." : "Create Post"}
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## Stunk vs React Query
+
+React Query requires two separate functions — `mutate` (fire and forget, swallows errors) and `mutateAsync` (returns promise, throws on error):
+
+```ts
+// React Query — two functions, must choose
+const { mutate, mutateAsync } = useMutation({ mutationFn: createPost });
+
+mutate(data); // fire and forget
+await mutateAsync(data); // throws on error — requires try/catch
+
+// Invalidation — requires queryClient and query keys
+onSuccess: async () => {
+  await queryClient.invalidateQueries({ queryKey: ["posts"] });
+};
+```
+
+Stunk — one function, always safe, direct chunk references:
+
+```ts
+// Stunk — one function, both use cases
+const { mutate } = useMutation(createPost);
+
+mutate(data); // fire and forget — safe
+const { error } = await mutate(data); // await — also safe, no try/catch
+
+// Invalidation — just pass the chunks
+invalidates: [postsChunk];
+```
+
+---
+
+## What's next?
+
+<Cards>
+  <Card
+    title="Configure Query"
+    description="Set global defaults for all mutations and async chunks"
+    href="/docs/async/configure-query"
+  />
+  <Card
+    title="Async Chunk"
+    description="Reactive async state for data fetching"
+    href="/docs/async/async-chunk"
+  />
+</Cards>
