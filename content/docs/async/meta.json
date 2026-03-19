@@ -1,4 +1,9 @@
 {
   "title": "Async",
-  "pages": ["async-chunk", "infinite-async-chunk", "combine-async-chunks"]
+  "pages": [
+    "configure-query",
+    "async-chunk",
+    "infinite-async-chunk",
+    "combine-async-chunks"
+  ]
 }
