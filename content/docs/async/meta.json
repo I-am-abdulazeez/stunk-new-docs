@@ -3,6 +3,7 @@
   "pages": [
     "configure-query",
     "async-chunk",
+    "mutation",
     "infinite-async-chunk",
     "combine-async-chunks"
   ]
