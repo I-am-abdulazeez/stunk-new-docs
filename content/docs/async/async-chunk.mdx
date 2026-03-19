@@ -36,20 +36,27 @@ Fetchers with no parameters are called automatically on creation. Fetchers that 
 
 ## Options
 
-| Option                         | Type                       | Default  | Description                                            |
-| ------------------------------ | -------------------------- | -------- | ------------------------------------------------------ |
-| `key`                          | `string`                   | auto     | Deduplication key — concurrent calls share one request |
-| `enabled`                      | `boolean \| () => boolean` | `true`   | Disable fetching until ready                           |
-| `initialData`                  | `T`                        | `null`   | Seed data before the first fetch                       |
-| `keepPreviousData`             | `boolean`                  | `false`  | Show previous data while refetching — no UI flicker    |
-| `onSuccess`                    | `(data: T) => void`        | —        | Called after every successful fetch                    |
-| `onError`                      | `(error: E) => void`       | —        | Called when all retries are exhausted                  |
-| `retryCount`                   | `number`                   | `0`      | Number of retries on failure                           |
-| `retryDelay`                   | `number`                   | `1000`   | ms between retries                                     |
-| `refresh.staleTime`            | `number`                   | `0`      | ms before data is considered stale                     |
-| `refresh.cacheTime`            | `number`                   | `300000` | ms to keep cache after last subscriber leaves          |
-| `refresh.refetchInterval`      | `number`                   | —        | Auto-refetch interval in ms                            |
-| `refresh.refetchOnWindowFocus` | `boolean`                  | `false`  | Refetch when window regains focus                      |
+| Option                 | Type                       | Default   | Description                                            |
+| ---------------------- | -------------------------- | --------- | ------------------------------------------------------ |
+| `key`                  | `string`                   | auto      | Deduplication key — concurrent calls share one request |
+| `enabled`              | `boolean \| () => boolean` | `true`    | Disable fetching until ready                           |
+| `initialData`          | `T`                        | `null`    | Seed data before the first fetch                       |
+| `keepPreviousData`     | `boolean`                  | `false`   | Show previous data while refetching — no UI flicker    |
+| `onSuccess`            | `(data: T) => void`        | —         | Called after every successful fetch                    |
+| `onError`              | `(error: E) => void`       | —         | Called when all retries are exhausted                  |
+| `retryCount`           | `number`                   | `0`       | Number of retries on failure                           |
+| `retryDelay`           | `number`                   | `1000`    | ms between retries                                     |
+| `staleTime`            | `number`                   | `0`       | ms before data is considered stale                     |
+| `cacheTime`            | `number`                   | `300_000` | ms to keep cache after last subscriber leaves          |
+| `refetchInterval`      | `number`                   | —         | Auto-refetch interval in ms                            |
+| `refetchOnWindowFocus` | `boolean`                  | `false`   | Refetch when window regains focus                      |
+| `pagination`           | `object`                   | —         | Enable pagination — see Pagination section below       |
+
+<Callout type="info">
+  All options except `key`, `enabled`, `initialData`, `keepPreviousData`, and
+  `pagination` can be set globally via `configureQuery()` — per-chunk options
+  always override global defaults.
+</Callout>
 
 ---
 
@@ -86,7 +93,7 @@ Update fetcher params and trigger a fresh fetch. Pass `null` for a key to remove
 
 ```ts
 postsChunk.setParams({ category: "engineering" });
-postsChunk.setParams({ category: null }); // removes category
+postsChunk.setParams({ category: null }); // removes category key
 ```
 
 ### `clearParams()`
@@ -131,14 +138,14 @@ Use `key` to deduplicate concurrent requests — if two components call `reload(
 const userChunk = asyncChunk(fetchUser, { key: "user" });
 
 userChunk.reload();
-userChunk.reload(); // returns the same in-flight promise
+userChunk.reload(); // joins the same in-flight request
 ```
 
 ---
 
 ## keepPreviousData
 
-When params change, the default behavior is to show `null` while loading. Set `keepPreviousData: true` to keep showing the previous data instead — no flash of empty state:
+When params change, the default behavior shows `null` while loading. Set `keepPreviousData: true` to keep showing the previous data instead — no flash of empty state:
 
 ```ts
 const postsChunk = asyncChunk(
@@ -146,7 +153,7 @@ const postsChunk = asyncChunk(
   { keepPreviousData: true },
 );
 
-// While loading new category, isPlaceholderData is true and data still shows old posts
+// While loading, isPlaceholderData is true and data still shows previous results
 postsChunk.setParams({ category: "engineering" });
 ```
 
@@ -198,5 +205,15 @@ function PostList() {
     title="Combine Async Chunks"
     description="Merge multiple async chunks into one unified state"
     href="/docs/async/combine-async-chunks"
+  />
+  <Card
+    title="Mutation"
+    description="Reactive mutations for POST, PUT, DELETE with invalidation"
+    href="/docs/async/mutation"
+  />
+  <Card
+    title="Configure Query"
+    description="Set global defaults for all async chunks and mutations"
+    href="/docs/async/configure-query"
   />
 </Cards>
