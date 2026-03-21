@@ -9,7 +9,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
 Stunk exports a set of utility functions for inspecting chunks and guarding against invalid values.
 
 ```ts
-import { isChunk, isValidChunk, isValidChunkValue, once } from "stunk";
+import { isChunk, isValidChunk, isValidChunkValue, shallowEqual } from "stunk";
 import { combineAsyncChunks } from "stunk/query";
 ```
 
@@ -27,7 +27,7 @@ const count = chunk(0);
 isChunk(count); // true
 isChunk(42); // false
 isChunk(null); // false
-isChunk({}); // false
+isChunk({}); // false — missing required methods
 ```
 
 Useful when building generic utilities that may receive unknown values:
@@ -83,29 +83,31 @@ isValidChunkValue(undefined); // false — undefined is never allowed
 
 ---
 
-## `once(fn)`
+## `shallowEqual(a, b)`
 
-Returns a wrapper function that calls `fn` only on the first invocation. Subsequent calls return the cached result.
+Compares two values with shallow equality. Returns `true` if both values are the same reference, or if they are objects/arrays with the same keys and values at the top level.
+
+Used internally by `computed()` and `select()` to avoid unnecessary subscriber notifications when object values haven't meaningfully changed.
 
 ```ts
-import { once } from "stunk";
+import { shallowEqual } from "stunk";
 
-const initialize = once(() => {
-  console.log("initialized!");
-  return 42;
-});
-
-initialize(); // logs "initialized!", returns 42
-initialize(); // returns 42, no log
+shallowEqual(1, 1); // true
+shallowEqual({ a: 1 }, { a: 1 }); // true — same flat values
+shallowEqual({ a: 1 }, { a: 2 }); // false
+shallowEqual({ a: { b: 1 } }, { a: { b: 1 } }); // false — nested refs differ
+shallowEqual([1, 2, 3], [1, 2, 3]); // true
 ```
 
-Useful for lazy initialization of chunks that should only be created once:
+Useful when writing custom middleware or utilities that need to compare chunk values:
 
 ```ts
-const getStore = once(() => chunk({ user: null, theme: "light" }));
+import { shallowEqual } from "stunk";
+import type { Middleware } from "stunk";
 
-const store = getStore(); // chunk created
-const same = getStore(); // same chunk returned
+const deduplicateObjects: Middleware<object> = (value) => {
+  // custom dedup logic using shallow equality
+};
 ```
 
 ---
