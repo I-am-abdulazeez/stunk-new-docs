@@ -124,7 +124,8 @@ const CustomTooltip = ({
   if (!active || !payload?.length) return null;
   const item = payload[0];
   const name = item.payload.name as string;
-  const value = item.value as number;
+  const rawValue = item.value;
+  const value = typeof rawValue === "number" ? rawValue : Number(rawValue);
   return (
     <div
       className="rounded-lg border px-3 py-2 text-xs shadow-md"
@@ -255,7 +256,7 @@ export default function BenchmarkChart() {
                     const stunk = isStunk(name);
                     return (
                       <text
-                        x={x - 4}
+                        x={(x as number) - 4}
                         y={y}
                         dy={4}
                         textAnchor="end"
