@@ -30,6 +30,7 @@ import TypewriterCode from "./landings/typewriter";
 import AnimatedStateFlow from "./landings/state-flow";
 
 import stunkLogo from "@/assets/logo.svg";
+import BenchmarkChart from "./landings/benchmark-chart";
 
 const FEATURES = [
   {
@@ -287,6 +288,8 @@ export default function StunkLanding() {
             </div>
           </div>
         </section>
+
+        <BenchmarkChart />
 
         {/*  Framework support ─ */}
         <section className="border-b border-fd-border bg-fd-secondary/20">
