@@ -26,17 +26,52 @@ interface Benchmark {
   data: LibResult[];
 }
 
+// Brand colors per library — used consistently across all charts
+const LIB_COLORS: Record<string, string> = {
+  Stunk: "#2af4c2",
+  "Stunk (1 chunk)": "#2af4c2",
+  "Stunk (3 chunks)": "#1bc9a0",
+  "Stunk select()": "#2af4c2",
+  "Stunk computed()": "#1bc9a0",
+  "Stunk peek()": "#2af4c2",
+  "Stunk get()": "#1bc9a0",
+  Zustand: "#ff6b35",
+  "Zustand (1 object)": "#ff6b35",
+  TanStack: "#3b82f6",
+  "TanStack (3 stores)": "#3b82f6",
+  Jotai: "#a78bfa",
+  Valtio: "#f59e0b",
+  Redux: "#ef4444",
+};
+
+function getColor(name: string): string {
+  return LIB_COLORS[name] ?? "#6b7280";
+}
+
+function isStunk(name: string) {
+  return name.toLowerCase().startsWith("stunk");
+}
+
+function formatValue(value: number, unit: string) {
+  if (unit === "ops/sec") {
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+    return value.toString();
+  }
+  if (value < 1) return value.toFixed(2);
+  return value.toFixed(1);
+}
+
 const BENCHMARKS: Record<BenchmarkKey, Benchmark> = {
   write: {
     label: "State Write",
     unit: "M ops/sec",
     description: "set() / setState() — single value update with subscribers",
     footnote:
-      "Higher is better. Stunk is 2nd — 38% faster than Zustand. Stunk's set() handles middleware, shape validation, and subscriber notification. TanStack uses a signals architecture.",
+      "Stunk wins — 38% faster than Zustand. Both Stunk and TanStack use signal-based architectures. TanStack's marginal difference comes from a leaner pipeline with no middleware or shape validation layer.",
     data: [
-      { name: "TanStack", value: 10.0 },
-      { name: "Stunk", value: 9.6 },
-      { name: "Zustand", value: 7.0 },
+      { name: "Stunk", value: 10.2 },
+      { name: "TanStack", value: 9.9 },
+      { name: "Zustand", value: 7.4 },
       { name: "Valtio", value: 1.3 },
       { name: "Jotai", value: 0.6 },
       { name: "Redux", value: 0.1 },
@@ -45,16 +80,17 @@ const BENCHMARKS: Record<BenchmarkKey, Benchmark> = {
   batch: {
     label: "Batch Updates",
     unit: "ops/sec",
-    description: "1000 × 3 updates batched — consistency matters here",
+    description: "1000 updates batched — one notification per iteration",
     footnote:
-      "Higher ops/sec is better. Stunk and TanStack use native batch(). Zustand has no vanilla batch — each setState() notifies immediately. Stunk's p99 latency (0.8ms) is 2× more consistent than TanStack (1.6ms) and Zustand (1.7ms) under load.",
+      "Two Stunk entries for fairness: '1 chunk' matches Zustand's single-object pattern; '3 chunks' is Stunk's real atomic use case. Zustand has no vanilla batch API — setState() on one object is inherently atomic. TanStack's batch uses an async scheduler giving it lower overhead in tight loops; in real apps the gap is negligible.",
     data: [
-      { name: "TanStack", value: 11436 },
-      { name: "Zustand", value: 8359, note: "no batch API" },
-      { name: "Stunk", value: 6639 },
-      { name: "Valtio", value: 542 },
-      { name: "Jotai", value: 143, note: "no batch API" },
-      { name: "Redux", value: 99 },
+      { name: "TanStack (3 stores)", value: 11342 },
+      { name: "Stunk (1 chunk)", value: 9555 },
+      { name: "Zustand (1 object)", value: 9304, note: "no batch API" },
+      { name: "Stunk (3 chunks)", value: 8471 },
+      { name: "Valtio", value: 578 },
+      { name: "Jotai", value: 206, note: "no batch API" },
+      { name: "Redux", value: 106 },
     ],
   },
   derived: {
@@ -62,15 +98,15 @@ const BENCHMARKS: Record<BenchmarkKey, Benchmark> = {
     unit: "M ops/sec",
     description: "Write + propagate to subscriber — eager mode",
     footnote:
-      "Stunk select() uses a manual selector — the same pattern as Zustand. It wins outright. Stunk computed() uses auto dependency tracking (no selectors to write) at a ~35% cost vs select(). Both are shown for an honest comparison.",
+      "Stunk select() wins — uses a manual selector, same pattern as Zustand. Stunk computed() uses auto dependency tracking (no selectors to write) at a ~46% cost vs select(). Both shown for an honest comparison.",
     data: [
-      { name: "Stunk select()", value: 6.9 },
-      { name: "Zustand", value: 5.5 },
-      { name: "TanStack", value: 4.2 },
-      { name: "Stunk computed()", value: 3.6 },
+      { name: "Stunk select()", value: 7.3 },
+      { name: "TanStack", value: 4.7 },
+      { name: "Zustand", value: 4.6 },
+      { name: "Stunk computed()", value: 3.9 },
       { name: "Valtio", value: 1.3 },
-      { name: "Jotai", value: 0.2 },
-      { name: "Redux", value: 0.08 },
+      { name: "Jotai", value: 0.21 },
+      { name: "Redux", value: 0.097 },
     ],
   },
   read: {
@@ -80,13 +116,13 @@ const BENCHMARKS: Record<BenchmarkKey, Benchmark> = {
     footnote:
       "All libraries except Jotai perform within the same tier (~10M ops/sec). Run-to-run variance exceeds inter-library differences — ranking is not meaningful here. Stunk peek() skips dependency tracking overhead; get() includes it for reactive computed support.",
     data: [
-      { name: "Stunk peek()", value: 10.3 },
-      { name: "Stunk get()", value: 10.3 },
-      { name: "Zustand", value: 10.2 },
-      { name: "TanStack", value: 10.2 },
-      { name: "Valtio", value: 9.9 },
-      { name: "Redux", value: 9.8 },
-      { name: "Jotai", value: 4.0 },
+      { name: "Stunk peek()", value: 10.4 },
+      { name: "Zustand", value: 10.3 },
+      { name: "Stunk get()", value: 10.2 },
+      { name: "Redux", value: 10.2 },
+      { name: "TanStack", value: 9.7 },
+      { name: "Valtio", value: 9.6 },
+      { name: "Jotai", value: 3.4 },
     ],
   },
 };
@@ -98,18 +134,14 @@ const TABS: { key: BenchmarkKey; label: string }[] = [
   { key: "read", label: "Read" },
 ];
 
-function isStunk(name: string) {
-  return name.toLowerCase().startsWith("stunk");
-}
-
-function formatValue(value: number, unit: string) {
-  if (unit === "ops/sec") {
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-    return value.toString();
-  }
-  // M ops/sec
-  if (value < 1) return value.toFixed(2);
-  return value.toFixed(1);
+// Legend dot
+function LibDot({ name }: { name: string }) {
+  return (
+    <span
+      className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+      style={{ backgroundColor: getColor(name) }}
+    />
+  );
 }
 
 const CustomTooltip = ({
@@ -124,29 +156,86 @@ const CustomTooltip = ({
   if (!active || !payload?.length) return null;
   const item = payload[0];
   const name = item.payload.name as string;
+  const note = item.payload.note as string | undefined;
   const rawValue = item.value;
   const value = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  const color = getColor(name);
+
   return (
     <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-md"
+      className="rounded-lg border px-3.5 py-2.5 text-xs shadow-lg min-w-[140px]"
       style={{
         backgroundColor: "var(--fd-card)",
-        borderColor: "rgba(42,244,194,0.3)",
+        borderColor: color + "55",
         color: "var(--fd-foreground)",
       }}
     >
-      <div
-        className="font-semibold mb-0.5"
-        style={{ color: "var(--stunk-teal-text)" }}
+      <div className="flex items-center gap-2 font-semibold mb-1.5">
+        <LibDot name={name} />
+        <span>{name}</span>
+      </div>
+      <div className="text-base font-bold tabular-nums" style={{ color }}>
+        {unit === "ops/sec"
+          ? `${value.toLocaleString()}`
+          : `${formatValue(value, unit)}`}
+        <span
+          className="text-xs font-normal ml-1"
+          style={{ color: "var(--fd-muted-foreground)" }}
+        >
+          {unit}
+        </span>
+      </div>
+      {note && (
+        <div
+          className="mt-1.5 text-[10px]"
+          style={{ color: "var(--fd-muted-foreground)" }}
+        >
+          {note}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom Y-axis tick with colored dot
+const CustomYAxisTick = ({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+}) => {
+  if (!x || !y || !payload) return null;
+  const name = payload.value;
+  const color = getColor(name);
+  const stunk = isStunk(name);
+  const dotSize = 6;
+  const textX = x - 4;
+  const dotX = textX - 2;
+
+  return (
+    <g>
+      <circle
+        cx={dotX - dotSize / 2 - 60}
+        cy={y}
+        r={dotSize / 2}
+        fill={color}
+        opacity={0.9}
+      />
+      <text
+        x={dotX - dotSize - 62}
+        y={y}
+        dy={4}
+        textAnchor="end"
+        fontSize={11}
+        fontWeight={stunk ? 700 : 400}
+        fill={stunk ? color : "var(--fd-muted-foreground)"}
       >
         {name}
-      </div>
-      <div style={{ color: "var(--fd-muted-foreground)" }}>
-        {unit === "ops/sec"
-          ? `${value.toLocaleString()} ops/sec`
-          : `${formatValue(value, unit)} ${unit}`}
-      </div>
-    </div>
+      </text>
+    </g>
   );
 };
 
@@ -221,7 +310,7 @@ export default function BenchmarkChart() {
           }}
         >
           {/* Chart label + description */}
-          <div className="mb-4 flex flex-wrap items-baseline gap-2">
+          <div className="mb-6 flex flex-wrap items-baseline gap-2">
             <span className="text-sm font-semibold">{bench.label}</span>
             <span
               className="text-xs"
@@ -231,63 +320,43 @@ export default function BenchmarkChart() {
             </span>
           </div>
 
-          {/* Bar chart */}
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          {/* Bar chart — fixed height container prevents the recharts 0-size warning */}
+          <div style={{ width: "100%", height: 280 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={sorted}
                 layout="vertical"
-                margin={{ top: 0, right: 16, left: 8, bottom: 0 }}
-                barCategoryGap="28%"
+                margin={{ top: 0, right: 16, left: 148, bottom: 0 }}
+                barCategoryGap="30%"
               >
                 <XAxis
                   type="number"
-                  tickFormatter={(v) => formatValue(v, bench.unit)}
-                  tick={{ fontSize: 11, fill: "var(--fd-muted-foreground)" }}
+                  tickFormatter={(v) => formatValue(v as number, bench.unit)}
+                  tick={{
+                    fontSize: 11,
+                    fill: "var(--fd-muted-foreground)",
+                  }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={108}
-                  tick={({ x, y, payload }) => {
-                    const name = payload.value as string;
-                    const stunk = isStunk(name);
-                    return (
-                      <text
-                        x={(x as number) - 4}
-                        y={y}
-                        dy={4}
-                        textAnchor="end"
-                        fontSize={11}
-                        fontWeight={stunk ? 700 : 400}
-                        fill={
-                          stunk
-                            ? "var(--stunk-teal-text)"
-                            : "var(--fd-muted-foreground)"
-                        }
-                      >
-                        {name}
-                      </text>
-                    );
-                  }}
+                  width={1}
+                  tick={(props) => <CustomYAxisTick {...props} />}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
                   content={<CustomTooltip unit={bench.unit} />}
-                  cursor={{ fill: "rgba(42,244,194,0.04)" }}
+                  cursor={{ fill: "rgba(255,255,255,0.03)" }}
                 />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={20}>
+                <Bar dataKey="value" radius={[0, 5, 5, 0]} maxBarSize={22}>
                   {sorted.map((entry) => (
                     <Cell
                       key={entry.name}
-                      fill={
-                        isStunk(entry.name)
-                          ? "var(--stunk-teal)"
-                          : "rgba(120,120,140,0.2)"
-                      }
+                      fill={getColor(entry.name)}
+                      opacity={isStunk(entry.name) ? 1 : 0.65}
                     />
                   ))}
                 </Bar>
@@ -297,18 +366,19 @@ export default function BenchmarkChart() {
 
           {/* Notes for libraries missing native features */}
           {sorted.some((d) => d.note) && (
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-4">
               {sorted
                 .filter((d) => d.note)
                 .map((d) => (
                   <span
                     key={d.name}
-                    className="text-xs px-2 py-0.5 rounded-full border"
+                    className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border"
                     style={{
-                      borderColor: "rgba(120,120,140,0.25)",
+                      borderColor: "rgba(120,120,140,0.2)",
                       color: "var(--fd-muted-foreground)",
                     }}
                   >
+                    <LibDot name={d.name} />
                     {d.name} — {d.note}
                   </span>
                 ))}
@@ -327,8 +397,37 @@ export default function BenchmarkChart() {
           </p>
         </div>
 
+        {/* Legend row */}
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-5">
+          {Object.entries(LIB_COLORS)
+            .filter(
+              ([name]) =>
+                !name.includes("(") &&
+                ![
+                  "Stunk peek()",
+                  "Stunk get()",
+                  "Stunk select()",
+                  "Stunk computed()",
+                ].includes(name),
+            )
+            .map(([name, color]) => (
+              <div key={name} className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--fd-muted-foreground)" }}
+                >
+                  {name}
+                </span>
+              </div>
+            ))}
+        </div>
+
         {/* Source link */}
-        <div className="text-center mt-5">
+        <div className="text-center mt-4">
           <a
             href="https://github.com/I-am-abdulazeez/stunk/tree/main/benchmarks"
             target="_blank"
