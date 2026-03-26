@@ -138,7 +138,7 @@ const TABS: { key: BenchmarkKey; label: string }[] = [
 function LibDot({ name }: { name: string }) {
   return (
     <span
-      className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+      className="inline-block w-2 h-2 rounded-full shrink-0"
       style={{ backgroundColor: getColor(name) }}
     />
   );
@@ -163,11 +163,12 @@ const CustomTooltip = ({
 
   return (
     <div
-      className="rounded-lg border px-3.5 py-2.5 text-xs shadow-lg min-w-[140px]"
+      className="rounded-lg border px-3.5 py-2.5 text-xs shadow-lg min-w-35"
       style={{
-        backgroundColor: "var(--fd-card)",
-        borderColor: color + "55",
-        color: "var(--fd-foreground)",
+        backgroundColor: "var(--fd-background, #1a1a1a)",
+        borderColor: color + "66",
+        color: "var(--fd-foreground, #f4f4f5)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
       }}
     >
       <div className="flex items-center gap-2 font-semibold mb-1.5">
@@ -198,40 +199,35 @@ const CustomTooltip = ({
 };
 
 // Custom Y-axis tick with colored dot
-const CustomYAxisTick = ({
-  x,
-  y,
-  payload,
-}: {
-  x?: number;
-  y?: number;
-  payload?: { value: string };
-}) => {
-  if (!x || !y || !payload) return null;
-  const name = payload.value;
+// Recharts may pass x/y as string or number — accept both and convert
+const CustomYAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  if (x == null || y == null || !payload) return null;
+  const nx = typeof x === "string" ? parseFloat(x) : (x as number);
+  const ny = typeof y === "string" ? parseFloat(y) : (y as number);
+  const name = payload.value as string;
   const color = getColor(name);
   const stunk = isStunk(name);
-  const dotSize = 6;
-  const textX = x - 4;
-  const dotX = textX - 2;
+  const GAP = 8;
+  const DOT = 6;
 
   return (
     <g>
       <circle
-        cx={dotX - dotSize / 2 - 60}
-        cy={y}
-        r={dotSize / 2}
+        cx={nx - GAP - DOT}
+        cy={ny}
+        r={DOT / 2}
         fill={color}
-        opacity={0.9}
+        opacity={isStunk(name) ? 1 : 0.8}
       />
       <text
-        x={dotX - dotSize - 62}
-        y={y}
+        x={nx - GAP - DOT * 2 - 2}
+        y={ny}
         dy={4}
         textAnchor="end"
         fontSize={11}
         fontWeight={stunk ? 700 : 400}
-        fill={stunk ? color : "var(--fd-muted-foreground)"}
+        fill={stunk ? color : "#9ca3af"}
       >
         {name}
       </text>
@@ -326,7 +322,7 @@ export default function BenchmarkChart() {
               <BarChart
                 data={sorted}
                 layout="vertical"
-                margin={{ top: 0, right: 16, left: 148, bottom: 0 }}
+                margin={{ top: 0, right: 20, left: 160, bottom: 0 }}
                 barCategoryGap="30%"
               >
                 <XAxis
@@ -334,7 +330,7 @@ export default function BenchmarkChart() {
                   tickFormatter={(v) => formatValue(v as number, bench.unit)}
                   tick={{
                     fontSize: 11,
-                    fill: "var(--fd-muted-foreground)",
+                    fill: "#9ca3af",
                   }}
                   axisLine={false}
                   tickLine={false}
