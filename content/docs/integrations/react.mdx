@@ -14,6 +14,7 @@ import {
   useChunkValue,
   useAsyncChunk,
   useInfiniteAsyncChunk,
+  useMutation,
 } from "stunk/react";
 ```
 
@@ -154,10 +155,36 @@ function PostList() {
 
 ### Options
 
-| Option          | Type         | Description                                |
-| --------------- | ------------ | ------------------------------------------ |
-| `initialParams` | `Partial<P>` | Params to pass to the fetcher on mount     |
-| `fetchOnMount`  | `boolean`    | Force fetch on mount for param-less chunks |
+| Option         | Type                 | Description                                                           |
+| -------------- | -------------------- | --------------------------------------------------------------------- |
+| `params`       | `Partial<P>`         | Params to pass to the fetcher. Re-fetches automatically when changed. |
+| `fetchOnMount` | `boolean`            | Force fetch on mount for param-less chunks (default: `false`)         |
+| `onSuccess`    | `(data: T) => void`  | Called after every successful fetch. Has full React context access.   |
+| `onError`      | `(error: E) => void` | Called when a fetch fails. Has full React context access.             |
+
+<Callout type="info">
+  `initialParams` is deprecated — use `params` instead. It will be removed in v3
+  stable.
+</Callout>
+
+### Hook-level callbacks
+
+`onSuccess` and `onError` at the hook level have full access to React context — navigate, setState, anything React. This is the correct place for navigation after fetch, unlike `asyncChunk`-level callbacks which are defined at module scope and have no React context.
+
+```tsx
+function ProfilePage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+
+  const { data, loading } = useAsyncChunk(profileChunk, {
+    onSuccess: (data) => {
+      if (!data) return navigate("/login");
+      setName(data.name);
+    },
+    onError: () => navigate("/error"),
+  });
+}
+```
 
 ### Return value
 
@@ -184,6 +211,72 @@ function PostList() {
   `useAsyncChunk` automatically calls `cleanup()` when the component unmounts —
   clearing any polling intervals or cache timers.
 </Callout>
+
+---
+
+## `useMutation`
+
+Subscribes to a mutation and returns `mutate`, `loading`, `error`, and `data`.
+
+```tsx
+import { mutation } from "stunk/query";
+import { useMutation } from "stunk/react";
+
+const createPostMutation = mutation(
+  async (payload: { title: string }) => apiCreatePost(payload),
+  { invalidates: [postsChunk] },
+);
+
+function CreatePost() {
+  const { mutate, loading, error } = useMutation(createPostMutation);
+
+  async function handleSubmit(title: string) {
+    const { error } = await mutate({ title });
+    if (!error) toast.success("Post created");
+  }
+
+  return (
+    <button onClick={() => handleSubmit("My post")} disabled={loading}>
+      {loading ? "Creating..." : "Create"}
+    </button>
+  );
+}
+```
+
+### Hook-level callbacks
+
+Like `useAsyncChunk`, `useMutation` supports `onSuccess` and `onError` at the hook level for navigation and React state updates:
+
+```tsx
+function CreateTenant() {
+  const navigate = useNavigate();
+
+  const { mutate, loading } = useMutation(createTenantMutation, {
+    onSuccess: (tenant) => {
+      toast.success("Tenant added");
+      navigate(`/tenants/${tenant.id}`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+}
+```
+
+### Options
+
+| Option      | Type                 | Description                                        |
+| ----------- | -------------------- | -------------------------------------------------- |
+| `onSuccess` | `(data: T) => void`  | Called after mutation succeeds. Has React context. |
+| `onError`   | `(error: E) => void` | Called when mutation fails. Has React context.     |
+
+### Return value
+
+|           | Type                           | Description                              |
+| --------- | ------------------------------ | ---------------------------------------- |
+| `mutate`  | `(payload) => Promise<Result>` | Trigger the mutation                     |
+| `loading` | `boolean`                      | `true` while the mutation is in progress |
+| `error`   | `E \| null`                    | Error from the last failed mutation      |
+| `data`    | `T \| null`                    | Data from the last successful mutation   |
+| `reset`   | `() => void`                   | Reset state to idle                      |
 
 ---
 
@@ -250,4 +343,5 @@ function PostFeed() {
 | `useChunk`              | Read + write a chunk                         |
 | `useChunkValue`         | Read-only — also for derived/computed/select |
 | `useAsyncChunk`         | Async state with loading/error/data          |
+| `useMutation`           | POST, PUT, DELETE with cache invalidation    |
 | `useInfiniteAsyncChunk` | Infinite scroll with auto-load               |
