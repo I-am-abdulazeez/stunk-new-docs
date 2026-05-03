@@ -36,27 +36,46 @@ Fetchers with no parameters are called automatically on creation. Fetchers that 
 
 ## Options
 
-| Option                 | Type                       | Default   | Description                                            |
-| ---------------------- | -------------------------- | --------- | ------------------------------------------------------ |
-| `key`                  | `string`                   | auto      | Deduplication key — concurrent calls share one request |
-| `enabled`              | `boolean \| () => boolean` | `true`    | Disable fetching until ready                           |
-| `initialData`          | `T`                        | `null`    | Seed data before the first fetch                       |
-| `keepPreviousData`     | `boolean`                  | `false`   | Show previous data while refetching — no UI flicker    |
-| `onSuccess`            | `(data: T) => void`        | —         | Called after every successful fetch                    |
-| `onError`              | `(error: E) => void`       | —         | Called when all retries are exhausted                  |
-| `retryCount`           | `number`                   | `0`       | Number of retries on failure                           |
-| `retryDelay`           | `number`                   | `1000`    | ms between retries                                     |
-| `staleTime`            | `number`                   | `0`       | ms before data is considered stale                     |
-| `cacheTime`            | `number`                   | `300_000` | ms to keep cache after last subscriber leaves          |
-| `refetchInterval`      | `number`                   | —         | Auto-refetch interval in ms                            |
-| `refetchOnWindowFocus` | `boolean`                  | `false`   | Refetch when window regains focus                      |
-| `pagination`           | `object`                   | —         | Enable pagination — see Pagination section below       |
+| Option                 | Type                                           | Default   | Description                                            |
+| ---------------------- | ---------------------------------------------- | --------- | ------------------------------------------------------ |
+| `key`                  | `string`                                       | auto      | Deduplication key — concurrent calls share one request |
+| `enabled`              | `boolean \| ((params: Partial<P>) => boolean)` | `true`    | Disable fetching until ready — receives current params |
+| `initialData`          | `T`                                            | `null`    | Seed data before the first fetch                       |
+| `keepPreviousData`     | `boolean`                                      | `false`   | Show previous data while refetching — no UI flicker    |
+| `onSuccess`            | `(data: T) => void`                            | —         | Called after every successful fetch                    |
+| `onError`              | `(error: E) => void`                           | —         | Called when all retries are exhausted                  |
+| `retryCount`           | `number`                                       | `0`       | Number of retries on failure                           |
+| `retryDelay`           | `number`                                       | `1000`    | ms between retries                                     |
+| `staleTime`            | `number`                                       | `0`       | ms before data is considered stale                     |
+| `cacheTime`            | `number`                                       | `300_000` | ms to keep cache after last subscriber leaves          |
+| `refetchInterval`      | `number`                                       | —         | Auto-refetch interval in ms                            |
+| `refetchOnWindowFocus` | `boolean`                                      | `false`   | Refetch when window regains focus                      |
+| `pagination`           | `object`                                       | —         | Enable pagination — see Pagination section below       |
 
 <Callout type="info">
   All options except `key`, `enabled`, `initialData`, `keepPreviousData`, and
   `pagination` can be set globally via `configureQuery()` — per-chunk options
   always override global defaults.
 </Callout>
+
+---
+
+## Conditional fetching with `enabled`
+
+`enabled` accepts a boolean or a function that receives the current params. This is the cleanest way to prevent fetching until required data is available:
+
+```ts
+// Static — never fetches
+const chunk = asyncChunk(fetcher, { enabled: false });
+
+// Dynamic — re-evaluated on every setParams call
+const flatsByHouseChunk = asyncChunk(
+  ({ houseId }: { houseId: string }) => apiGetFlatsByHouse(houseId),
+  { enabled: ({ houseId }) => !!houseId },
+);
+```
+
+The function receives the same params the fetcher will get — defined once on the chunk, no repetition at the hook callsite.
 
 ---
 
