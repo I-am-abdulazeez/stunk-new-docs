@@ -21,6 +21,16 @@ export const Route = createFileRoute("/docs/")({
   loader: async () => {
     return await serverLoader();
   },
+  head: ({ loaderData }) => ({
+    meta: loaderData
+      ? [
+          { title: `${loaderData.title} — Stunk` },
+          { name: "description", content: loaderData.description ?? "" },
+          { property: "og:title", content: loaderData.title },
+          { property: "og:description", content: loaderData.description ?? "" },
+        ]
+      : [],
+  }),
 });
 
 const serverLoader = createServerFn({ method: "GET" }).handler(async () => {
@@ -31,6 +41,8 @@ const serverLoader = createServerFn({ method: "GET" }).handler(async () => {
   return {
     path: page.path,
     pageTree: await source.serializePageTree(source.getPageTree()),
+    title: page.data.title, // ← add this
+    description: page.data.description, // ← and this
   };
 });
 

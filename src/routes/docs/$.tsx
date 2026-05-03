@@ -24,6 +24,14 @@ export const Route = createFileRoute("/docs/$")({
     await clientLoader.preload(data.path);
     return data;
   },
+  head: ({ loaderData }) => ({
+    meta: [
+      { title: loaderData?.title ?? "Stunk " },
+      { name: "description", content: loaderData?.description ?? "" },
+      { property: "og:title", content: loaderData?.title ?? "Docs — Stunk" },
+      { property: "og:description", content: loaderData?.description ?? "" },
+    ],
+  }),
 });
 
 const serverLoader = createServerFn({ method: "GET" })
@@ -35,6 +43,8 @@ const serverLoader = createServerFn({ method: "GET" })
     return {
       path: page.path,
       pageTree: await source.serializePageTree(source.getPageTree()),
+      title: page.data.title,
+      description: page.data.description,
     };
   });
 
