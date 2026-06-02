@@ -10,6 +10,9 @@ export default defineConfig({
   server: {
     port: 3002,
   },
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+  },
   plugins: [
     mdx(await import('./source.config')),
     tailwindcss(),
