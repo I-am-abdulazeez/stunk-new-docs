@@ -113,7 +113,7 @@ export function docsOptions(): Omit<DocsLayoutProps, "children" | "tree"> {
               className="font-semibold tabular-nums"
               style={{ color: "var(--stunk-teal-text)" }}
             >
-              v3.0.0-beta
+              {__APP_VERSION__}
             </span>
           </a>
 
