@@ -11,25 +11,25 @@ const PACKAGE_MANAGERS = [
     value: "npm",
     label: "npm",
     icon: SiNpm,
-    command: "npm install stunk",
+    command: "npm install stunk@rc",
   },
   {
     value: "pnpm",
     label: "pnpm",
     icon: SiPnpm,
-    command: "pnpm add stunk",
+    command: "pnpm add stunk@rc",
   },
   {
     value: "yarn",
     label: "yarn",
     icon: SiYarn,
-    command: "yarn add stunk",
+    command: "yarn add stunk@rc",
   },
   {
     value: "bun",
     label: "bun",
     icon: SiBun,
-    command: "bun add stunk",
+    command: "bun add stunk@rc",
   },
 ];
 
