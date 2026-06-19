@@ -13,7 +13,103 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ---
 
-## v3.0.0 — alpha.2 (Current)
+## v3.0.0-rc.10 (Current)
+
+**Release candidate.** Soak-tested against a production v3 migration.
+
+<Callout type="warn">
+  This release contains a breaking change to `asyncChunk`'s pagination API. See
+  below before upgrading from rc.9 or earlier.
+</Callout>
+
+### Breaking change — `asyncChunk` pagination split into `paginatedAsyncChunk`
+
+`asyncChunk`'s 4-way overload (no-param/param × no-pagination/pagination) frequently
+resolved to the wrong overload when a chunk was assigned to an explicitly-typed
+variable, forcing a manual cast at every call site:
+
+```ts
+// rc.9 and earlier — required a cast
+const usersChunk = asyncChunk(fetchUsers, {
+  pagination: { pageSize: 10 },
+}) as PaginatedParamAsyncChunk<
+  User[],
+  Error,
+  { page: number; pageSize: number }
+>;
+```
+
+`asyncChunk` no longer accepts a `pagination` option. Pagination now lives in a
+dedicated function with a single, unambiguous signature — no cast required:
+
+```ts
+// rc.10 — no cast needed
+const usersChunk = paginatedAsyncChunk(fetchUsers, {
+  pagination: { pageSize: 10, mode: "replace" },
+});
+```
+
+This mirrors TanStack Query's `useQuery` / `useInfiniteQuery` split — one function,
+one return shape, no overload resolution.
+
+**Migration:** find every `asyncChunk(fetcher, { pagination: {...} })` call and
+rename it to `paginatedAsyncChunk(fetcher, { pagination: {...} })`. Drop any
+`as PaginatedParamAsyncChunk<...>` cast — it's no longer needed.
+
+`infiniteAsyncChunk` is unaffected at the call site — it now calls
+`paginatedAsyncChunk` internally instead of the ambiguous `asyncChunk`, and no
+longer needs its own internal type cast either. Its public API is unchanged.
+
+### Fixes
+
+- **`useAsyncChunk` now fetches on mount by default when enabled** — previously,
+  a chunk created with `enabled: false` that later became enabled required an
+  explicit `fetchOnMount: true` to actually fetch once mounted, which didn't
+  match the expected "fetch automatically unless `enabled: false`" behavior.
+  `fetchOnMount` is now only needed to force a refetch when data already exists.
+- **`useInfiniteAsyncChunk` now forwards `params`** — previously only the
+  deprecated `initialParams` reached the underlying fetcher; reactive `params`
+  passed by the caller were silently dropped, so search/filter inputs never
+  reached the server on subsequent renders.
+- **`setParams` resets paginated chunks to page 1** — previously, changing
+  params while on page 3 would fetch "page 3 with new params" instead of
+  starting over. Affects both `paginatedAsyncChunk` and `infiniteAsyncChunk`;
+  accumulated data is also cleared on reset when `mode: 'accumulate'`.
+- **`pageSize` no longer leaks into fetch params under that name** — Stunk's
+  internal pagination state injects `page`/`pageSize` automatically, but
+  backends that expect a different name (e.g. `limit`) would reject the
+  request. Map the field name inside your own fetcher wrapper.
+
+---
+
+## v3.0.0-rc.4 – v3.0.0-rc.9
+
+**Release candidates.** Incremental fixes shipped during the Nester Verify v3
+migration soak test.
+
+### Bug Fixes
+
+- `asyncChunk`: reactive `enabled` — when passed as a function, dependencies
+  are now tracked via `trackDependencies` and the chunk auto-fetches when they
+  change
+- `asyncChunk`: `setupSideEffects()` now called on `false → true` enabled
+  transition so `refetchInterval` starts correctly after login
+- `asyncChunk`: guard against duplicate intervals and focus listeners on
+  re-initialization
+- `asyncChunk`: `isNextPageFetch` flag — `accumulate` mode now only
+  accumulates on `nextPage()`; all other fetches (reload, reset, enabled
+  transition) replace data instead of appending
+- `useAsyncChunk`: new `enabled` option for React-level reactive fetch control
+- `mutation`: `invalidates` now calls `resetPagination()` on paginated chunks
+  instead of `reload()` to prevent stale page state
+
+### Exports
+
+- Added `PaginatedParamAsyncChunk` to public exports from `stunk/query`
+
+---
+
+## v3.0.0 — alpha.2
 
 **Alpha release.** Bundle size: **3.32kB gzipped** (core + React + Query).
 
@@ -52,6 +148,7 @@ const total = computed(() => price.get() * quantity.get());
 **Query — new subpath `stunk/query`**
 
 - `asyncChunk` — reactive async state with loading, error, data, lastFetched
+- `paginatedAsyncChunk` — dedicated page-based pagination, no overload ambiguity (added rc.10)
 - `infiniteAsyncChunk` — accumulate-mode pagination for infinite scroll
 - `combineAsyncChunks` — unified loading/error/data across multiple async chunks
 - `key` option — request deduplication, concurrent calls share one in-flight request
@@ -141,9 +238,11 @@ count.set((n) => n + 1); // update() removed
 
 ## Release History
 
-| Version       | Status        | Highlights                                               |
-| ------------- | ------------- | -------------------------------------------------------- |
-| `3.0.0-alpha` | 🚧 Alpha      | Computed redesign, stunk/query, strict mode, null values |
-| `2.8.1`       | ✅ Stable     | Latest stable, 2.95kB gzipped                            |
-| `2.x`         | ✅ Stable     | Full React integration, async, middleware, time travel   |
-| `1.x`         | ⚠️ Deprecated | Early API, no longer supported                           |
+| Version             | Status        | Highlights                                                               |
+| ------------------- | ------------- | ------------------------------------------------------------------------ |
+| `3.0.0-rc.10`       | 🚧 RC         | `paginatedAsyncChunk` split, fetchOnMount default, params forwarding fix |
+| `3.0.0-rc.4 – rc.9` | 🚧 RC         | Reactive `enabled`, accumulate-mode fix, `invalidates` pagination fix    |
+| `3.0.0-alpha`       | 🚧 Alpha      | Computed redesign, stunk/query, strict mode, null values                 |
+| `2.8.1`             | ✅ Stable     | Latest stable, 2.95kB gzipped                                            |
+| `2.x`               | ✅ Stable     | Full React integration, async, middleware, time travel                   |
+| `1.x`               | ⚠️ Deprecated | Early API, no longer supported                                           |
