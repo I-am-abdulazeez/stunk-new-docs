@@ -3,7 +3,7 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
-  "version": "3.0.0-rc.10",
+  "version": "3.0.0-rc.11",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
