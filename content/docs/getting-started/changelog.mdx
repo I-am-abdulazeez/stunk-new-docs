@@ -13,6 +13,16 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ---
 
+## v3.0.0-rc.13-14(Current)
+
+**Patch release.** Fixes a stale-response race condition when `setParams` is called while a fetch is in flight.
+
+### Fix
+
+When `setParams` was called while a previous `fetchData` was still awaiting a response, the old request could resolve _after_ the new one — overwriting the correct data with stale results. This caused "one step behind" behavior in paginated lists with status/filter dropdowns.
+
+Fixed by calling `inFlightRequests.delete(chunkKey)` inside `setParams` before starting the new fetch, so the old promise is dropped and a fresh request always wins.
+
 ## v3.0.0-rc.11 (Current)
 
 **Release candidate.** Adds cursor-based pagination support.
@@ -35,7 +45,7 @@ const conversations = infiniteAsyncChunk(
   {
     pageSize: 20,
     cursorMode: { getNextCursor: (response) => response.cursor },
-  }
+  },
 );
 
 conversations.nextPage(); // fetches using the cursor from the last response
@@ -76,8 +86,8 @@ expected and correctly reset/advance the cursor.
 **Release candidate.** Soak-tested against a production v3 migration.
 
 <Callout type="warn">
-  This release contains a breaking change to `asyncChunk`'s pagination API.
-  See below before upgrading from rc.9 or earlier.
+  This release contains a breaking change to `asyncChunk`'s pagination API. See
+  below before upgrading from rc.9 or earlier.
 </Callout>
 
 ### Breaking change — `asyncChunk` pagination split into `paginatedAsyncChunk`
@@ -90,7 +100,11 @@ variable, forcing a manual cast at every call site:
 // rc.9 and earlier — required a cast
 const usersChunk = asyncChunk(fetchUsers, {
   pagination: { pageSize: 10 },
-}) as PaginatedParamAsyncChunk<User[], Error, { page: number; pageSize: number }>;
+}) as PaginatedParamAsyncChunk<
+  User[],
+  Error,
+  { page: number; pageSize: number }
+>;
 ```
 
 `asyncChunk` no longer accepts a `pagination` option. Pagination now lives in a
@@ -229,15 +243,15 @@ const total = computed(() => price.get() * quantity.get());
 
 ### Breaking changes from v2
 
-| Change                         | v2                            | v3                    |
-| ------------------------------- | ------------------------------ | ---------------------- |
-| `computed()` API                | `computed([deps], fn)`         | `computed(() => fn)`  |
-| `withHistory`                   | `import { withHistory }`       | `import { history }`  |
-| `withPersistence`               | `import { withPersistence }`   | `import { persist }`  |
-| `asyncChunk` import              | `stunk`                        | `stunk/query`         |
-| `useDerive` / `useComputed`     | available                      | removed                |
-| `subscribe` fires on subscribe  | yes                             | no — only on change   |
-| `null` as chunk value           | forbidden                       | allowed                |
+| Change                         | v2                           | v3                   |
+| ------------------------------ | ---------------------------- | -------------------- |
+| `computed()` API               | `computed([deps], fn)`       | `computed(() => fn)` |
+| `withHistory`                  | `import { withHistory }`     | `import { history }` |
+| `withPersistence`              | `import { withPersistence }` | `import { persist }` |
+| `asyncChunk` import            | `stunk`                      | `stunk/query`        |
+| `useDerive` / `useComputed`    | available                    | removed              |
+| `subscribe` fires on subscribe | yes                          | no — only on change  |
+| `null` as chunk value          | forbidden                    | allowed              |
 
 ---
 
@@ -292,12 +306,12 @@ count.set((n) => n + 1); // update() removed
 
 ## Release History
 
-| Version             | Status        | Highlights                                                           |
-| --------------------- | -------------- | ----------------------------------------------------------------------- |
-| `3.0.0-rc.11`         | 🚧 RC          | Cursor-based pagination support                                         |
-| `3.0.0-rc.10`         | 🚧 RC          | `paginatedAsyncChunk` split, fetchOnMount default, params forwarding fix |
-| `3.0.0-rc.4 – rc.9`   | 🚧 RC          | Reactive `enabled`, accumulate-mode fix, `invalidates` pagination fix    |
-| `3.0.0-alpha`         | 🚧 Alpha       | Computed redesign, stunk/query, strict mode, null values                |
-| `2.8.1`               | ✅ Stable      | Latest stable, 2.95kB gzipped                                            |
-| `2.x`                 | ✅ Stable      | Full React integration, async, middleware, time travel                  |
-| `1.x`                 | ⚠️ Deprecated  | Early API, no longer supported                                          |
+| Version             | Status        | Highlights                                                               |
+| ------------------- | ------------- | ------------------------------------------------------------------------ |
+| `3.0.0-rc.11`       | 🚧 RC         | Cursor-based pagination support                                          |
+| `3.0.0-rc.10`       | 🚧 RC         | `paginatedAsyncChunk` split, fetchOnMount default, params forwarding fix |
+| `3.0.0-rc.4 – rc.9` | 🚧 RC         | Reactive `enabled`, accumulate-mode fix, `invalidates` pagination fix    |
+| `3.0.0-alpha`       | 🚧 Alpha      | Computed redesign, stunk/query, strict mode, null values                 |
+| `2.8.1`             | ✅ Stable     | Latest stable, 2.95kB gzipped                                            |
+| `2.x`               | ✅ Stable     | Full React integration, async, middleware, time travel                   |
+| `1.x`               | ⚠️ Deprecated | Early API, no longer supported                                           |
