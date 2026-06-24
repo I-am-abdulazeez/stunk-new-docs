@@ -13,6 +13,21 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ---
 
+## [3.0.1] - 2026-06-24
+
+### Fixed
+- Added `cancel()` method to `AsyncChunk` — cancels any in-flight request and sets `loading` to `false` immediately
+- Added `isCancelled` flag in `fetchData` — prevents cancelled async closures from setting data after cancellation
+- `useAsyncChunk` hook now calls `cancel()` when `enabled` flips from `true` to `false`
+- `useAsyncChunk` hook now uses `setParams()` instead of `reload()` when `enabled` flips from `false` to `true` and params are present — fixes fetch not triggering when `currentParams` was empty
+- `setParams()` and `reload()` now reset `isCancelled` flag before starting a new fetch
+
+### Added
+- `cancel: () => void` to `AsyncChunk` interface
+
+### Use case unlocked
+- Factory pattern (`createXChunk`) now works correctly with `enabled: isOpen` for modal data fetching — no background fetching after modal close, no stale data on reopen
+
 ## v3.0.0-rc.13-14(Current)
 
 **Patch release.** Fixes a stale-response race condition when `setParams` is called while a fetch is in flight.
@@ -23,7 +38,7 @@ When `setParams` was called while a previous `fetchData` was still awaiting a re
 
 Fixed by calling `inFlightRequests.delete(chunkKey)` inside `setParams` before starting the new fetch, so the old promise is dropped and a fresh request always wins.
 
-## v3.0.0-rc.11 (Current)
+## v3.0.0-rc.11
 
 **Release candidate.** Adds cursor-based pagination support.
 

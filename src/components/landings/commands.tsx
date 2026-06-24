@@ -4,7 +4,7 @@ import { useState } from "react";
 export default function InstallCommand() {
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    navigator.clipboard.writeText("npm install stunk@rc");
+    navigator.clipboard.writeText("npm install stunk");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -15,7 +15,7 @@ export default function InstallCommand() {
     >
       <span className="text-(--stunk-teal)">$</span>
       <span className="text-fd-muted-foreground">npm install</span>
-      <span className="text-fd-foreground font-semibold">stunk@rc</span>
+      <span className="text-fd-foreground font-semibold">stunk</span>
       <span className="ml-1 text-fd-muted-foreground group-hover:text-(--stunk-teal) transition-colors">
         {copied ? (
           <CheckCheck className="w-4 h-4" />
