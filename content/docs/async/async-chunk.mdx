@@ -36,26 +36,26 @@ Fetchers with no parameters are called automatically on creation. Fetchers that 
 
 ## Options
 
-| Option                 | Type                                           | Default   | Description                                            |
-| ---------------------- | ---------------------------------------------- | --------- | ------------------------------------------------------ |
-| `key`                  | `string`                                       | auto      | Deduplication key — concurrent calls share one request |
-| `enabled`              | `boolean \| ((params: Partial<P>) => boolean)` | `true`    | Disable fetching until ready — receives current params |
-| `initialData`          | `T`                                            | `null`    | Seed data before the first fetch                       |
-| `keepPreviousData`     | `boolean`                                      | `false`   | Show previous data while refetching — no UI flicker    |
-| `onSuccess`            | `(data: T) => void`                            | —         | Called after every successful fetch                    |
-| `onError`              | `(error: E) => void`                           | —         | Called when all retries are exhausted                  |
-| `retryCount`           | `number`                                       | `0`       | Number of retries on failure                           |
-| `retryDelay`           | `number`                                       | `1000`    | ms between retries                                     |
-| `staleTime`            | `number`                                       | `0`       | ms before data is considered stale                     |
-| `cacheTime`            | `number`                                       | `300_000` | ms to keep cache after last subscriber leaves          |
-| `refetchInterval`      | `number`                                       | —         | Auto-refetch interval in ms                            |
-| `refetchOnWindowFocus` | `boolean`                                      | `false`   | Refetch when window regains focus                      |
-| `pagination`           | `object`                                       | —         | Enable pagination — see Pagination section below       |
+| Option                 | Type                                           | Default   | Description                                                                       |
+| ---------------------- | ---------------------------------------------- | --------- | --------------------------------------------------------------------------------- |
+| `key`                  | `string`                                       | auto      | Deduplication key — concurrent calls share one request                            |
+| `enabled`              | `boolean \| ((params: Partial<P>) => boolean)` | `true`    | Disable fetching until ready — receives current params                            |
+| `initialData`          | `T`                                            | `null`    | Seed data before the first fetch                                                  |
+| `keepPreviousData`     | `boolean`                                      | `false`   | Show previous data while refetching — no UI flicker                               |
+| `clearOnParamChange`   | `boolean`                                      | `false`   | Clear data to `null` immediately when params change — eliminates stale data flash |
+| `onSuccess`            | `(data: T) => void`                            | —         | Called after every successful fetch                                               |
+| `onError`              | `(error: E) => void`                           | —         | Called when all retries are exhausted                                             |
+| `retryCount`           | `number`                                       | `0`       | Number of retries on failure                                                      |
+| `retryDelay`           | `number`                                       | `1000`    | ms between retries                                                                |
+| `staleTime`            | `number`                                       | `0`       | ms before data is considered stale                                                |
+| `cacheTime`            | `number`                                       | `300_000` | ms to keep cache after last subscriber leaves                                     |
+| `refetchInterval`      | `number`                                       | —         | Auto-refetch interval in ms                                                       |
+| `refetchOnWindowFocus` | `boolean`                                      | `false`   | Refetch when window regains focus                                                 |
 
 <Callout type="info">
-  All options except `key`, `enabled`, `initialData`, `keepPreviousData`, and
-  `pagination` can be set globally via `configureQuery()` — per-chunk options
-  always override global defaults.
+  All options except `key`, `enabled`, `initialData`, `keepPreviousData`,
+  `clearOnParamChange`, and `pagination` can be set globally via
+  `configureQuery()` — per-chunk options always override global defaults.
 </Callout>
 
 ---
@@ -76,6 +76,25 @@ const flatsByHouseChunk = asyncChunk(
 ```
 
 The function receives the same params the fetcher will get — defined once on the chunk, no repetition at the hook callsite.
+
+---
+
+## clearOnParamChange
+
+When navigating between detail views that share a single chunk (e.g. `/jobs/abc` → `/jobs/xyz`), the chunk holds the previous job's data until the new fetch resolves. Set `clearOnParamChange: true` to immediately reset `data` to `null` when `setParams()` is called — consumers see a clean `{ data: null, loading: true }` state instantly, with no stale flash.
+
+```ts
+export const jobDetailChunk = asyncChunk(
+  (params: { ref: string }) => api.getJobDetail(params.ref),
+  { staleTime: 0, clearOnParamChange: true },
+);
+```
+
+<Callout type="info">
+  `clearOnParamChange` and `keepPreviousData` are opposites — enabling both at
+  once is a contradiction. `clearOnParamChange` wins: data is cleared
+  immediately and `keepPreviousData` has no effect when both are set.
+</Callout>
 
 ---
 
@@ -104,6 +123,8 @@ Update `data` directly without a network request. Useful for optimistic updates.
 
 ```ts
 postsChunk.mutate((current) => [...(current ?? []), newPost]);
+// returning null clears data
+postsChunk.mutate(() => null);
 ```
 
 ### `setParams(params)`
@@ -121,6 +142,14 @@ Wipes all current params and refetches.
 
 ```ts
 postsChunk.clearParams();
+```
+
+### `cancel()`
+
+Cancels any in-flight request and sets `loading` to `false` immediately. Subsequent `reload()` or `setParams()` calls reset the cancelled state and fetch normally.
+
+```ts
+postsChunk.cancel();
 ```
 
 ### `reset()`
