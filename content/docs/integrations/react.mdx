@@ -158,6 +158,7 @@ function PostList() {
 | Option         | Type                 | Description                                                           |
 | -------------- | -------------------- | --------------------------------------------------------------------- |
 | `params`       | `Partial<P>`         | Params to pass to the fetcher. Re-fetches automatically when changed. |
+| `enabled`      | `boolean`            | Whether this component should fetch. Defaults to `true`.              |
 | `fetchOnMount` | `boolean`            | Force fetch on mount for param-less chunks (default: `false`)         |
 | `onSuccess`    | `(data: T) => void`  | Called after every successful fetch. Has full React context access.   |
 | `onError`      | `(error: E) => void` | Called when a fetch fails. Has full React context access.             |
@@ -166,6 +167,48 @@ function PostList() {
   `initialParams` is deprecated — use `params` instead. It will be removed in v3
   stable.
 </Callout>
+
+---
+
+### Where to put `enabled` — chunk level vs hook level
+
+`enabled` exists in two places and they serve different purposes. Using the wrong one leads to unexpected fetches or missed fetches.
+
+**`enabled` in `asyncChunk()`** controls whether the chunk is allowed to fetch at all — globally, for every consumer. Use it when the condition is app-wide and the same regardless of which component is using the chunk, or when the condition depends on another chunk (since chunk-level `enabled` supports reactive tracking).
+
+```ts
+// ✅ Auth guard — same condition everywhere, depends on another chunk
+export const jobMetricsChunk = asyncChunk(() => api.getJobMetrics(), {
+  enabled: () => !!authStore.accessToken.get(),
+});
+```
+
+**`enabled` in `useAsyncChunk()`** controls whether this specific component instance should fetch right now — based on local React state or props. Use it when the condition is local to a component, varies between components, or involves React state.
+
+```ts
+// ✅ Modal guard — local to this component, depends on React state
+const { data } = useAsyncChunk(companiesChunk, {
+  enabled: isOpen && !!jobRef,
+  params: { ref: jobRef },
+});
+```
+
+The rule:
+
+| The condition depends on…           | Put `enabled` in… |
+| ----------------------------------- | ----------------- |
+| Another chunk (auth, role, feature) | `asyncChunk()`    |
+| React state or props (isOpen, id)   | `useAsyncChunk()` |
+| The same logic in every consumer    | `asyncChunk()`    |
+| Only this one component             | `useAsyncChunk()` |
+
+<Callout type="warn">
+  Do not use chunk-level `enabled` and hook-level `enabled` to express the same
+  condition simultaneously — they are additive, not equivalent, and can cause
+  double-fetch races when both flip at the same time.
+</Callout>
+
+---
 
 ### Hook-level callbacks
 
@@ -328,11 +371,12 @@ function PostFeed() {
 
 ### Options
 
-| Option          | Type      | Default | Description                                      |
-| --------------- | --------- | ------- | ------------------------------------------------ |
-| `autoLoad`      | `boolean` | `true`  | Auto-load next page when sentinel is visible     |
-| `threshold`     | `number`  | `1.0`   | Intersection observer threshold                  |
-| `initialParams` | `object`  | —       | Initial params (excluding `page` and `pageSize`) |
+| Option          | Type      | Default | Description                                                                             |
+| --------------- | --------- | ------- | --------------------------------------------------------------------------------------- |
+| `autoLoad`      | `boolean` | `true`  | Auto-load next page when sentinel is visible                                            |
+| `threshold`     | `number`  | `1.0`   | Intersection observer threshold                                                         |
+| `params`        | `object`  | —       | Reactive params (excluding `page` and `pageSize`). Re-fetches from page 1 when changed. |
+| `initialParams` | `object`  | —       | Deprecated — use `params` instead                                                       |
 
 ---
 
