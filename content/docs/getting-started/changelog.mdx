@@ -13,9 +13,30 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ---
 
+## [3.0.2] - 2026-06-25
+
+### Added
+
+- `clearOnParamChange` option on `asyncChunk` and `paginatedAsyncChunk` — when `true`, `setParams()` immediately clears `data` to `null` before the new fetch resolves. Eliminates stale data flash when navigating between detail views that share a single chunk. Default: `false`.
+
+```ts
+export const jobDetailChunk = asyncChunk(
+  (params: { ref: string }) => api.getJobDetail(params.ref),
+  { staleTime: 0, clearOnParamChange: true },
+);
+```
+
+### Fixed
+
+- `useAsyncChunk` — deduplicated double-fetch when `enabled` flips `false → true` and `params` change in the same render. Previously both the `enabled` effect and the `paramsKey` effect fired `setParams` simultaneously, causing two network requests and a potential race condition. The `enabled` effect now signals the `paramsKey` effect to skip when it has already dispatched.
+- `mutate()` return type corrected from `(mutator: (currentData: T | null) => T)` to `(mutator: (currentData: T | null) => T | null)` — allows returning `null` from a mutator, which is consistent with `data` being typed `T | null`.
+
+---
+
 ## [3.0.1] - 2026-06-24
 
 ### Fixed
+
 - Added `cancel()` method to `AsyncChunk` — cancels any in-flight request and sets `loading` to `false` immediately
 - Added `isCancelled` flag in `fetchData` — prevents cancelled async closures from setting data after cancellation
 - `useAsyncChunk` hook now calls `cancel()` when `enabled` flips from `true` to `false`
@@ -23,12 +44,16 @@ import { Callout } from "fumadocs-ui/components/callout";
 - `setParams()` and `reload()` now reset `isCancelled` flag before starting a new fetch
 
 ### Added
+
 - `cancel: () => void` to `AsyncChunk` interface
 
 ### Use case unlocked
+
 - Factory pattern (`createXChunk`) now works correctly with `enabled: isOpen` for modal data fetching — no background fetching after modal close, no stale data on reopen
 
-## v3.0.0-rc.13-14(Current)
+---
+
+## v3.0.0-rc.13-14
 
 **Patch release.** Fixes a stale-response race condition when `setParams` is called while a fetch is in flight.
 
@@ -37,6 +62,8 @@ import { Callout } from "fumadocs-ui/components/callout";
 When `setParams` was called while a previous `fetchData` was still awaiting a response, the old request could resolve _after_ the new one — overwriting the correct data with stale results. This caused "one step behind" behavior in paginated lists with status/filter dropdowns.
 
 Fixed by calling `inFlightRequests.delete(chunkKey)` inside `setParams` before starting the new fetch, so the old promise is dropped and a fresh request always wins.
+
+---
 
 ## v3.0.0-rc.11
 
@@ -323,6 +350,8 @@ count.set((n) => n + 1); // update() removed
 
 | Version             | Status        | Highlights                                                               |
 | ------------------- | ------------- | ------------------------------------------------------------------------ |
+| `3.0.2`             | ✅ Latest     | `clearOnParamChange`, double-fetch fix, mutate type fix                  |
+| `3.0.1`             | ✅ Stable     | `cancel()`, enabled flip fixes                                           |
 | `3.0.0-rc.11`       | 🚧 RC         | Cursor-based pagination support                                          |
 | `3.0.0-rc.10`       | 🚧 RC         | `paginatedAsyncChunk` split, fetchOnMount default, params forwarding fix |
 | `3.0.0-rc.4 – rc.9` | 🚧 RC         | Reactive `enabled`, accumulate-mode fix, `invalidates` pagination fix    |
