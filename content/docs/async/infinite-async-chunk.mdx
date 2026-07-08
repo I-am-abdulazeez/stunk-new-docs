@@ -26,21 +26,22 @@ const postsChunk = infiniteAsyncChunk(
 
 ## Options
 
-| Option                 | Type                       | Default | Description                                             |
-| ---------------------- | -------------------------- | ------- | ------------------------------------------------------- |
-| `pageSize`             | `number`                   | `10`    | Items per page                                          |
-| `key`                  | `string`                   | auto    | Deduplication key — concurrent calls share one request  |
-| `enabled`              | `boolean \| () => boolean` | `true`  | Disable fetching until ready                            |
-| `initialData`          | `T[]`                      | —       | Seed data before the first fetch                        |
-| `keepPreviousData`     | `boolean`                  | `false` | Show previous data while next page loads                |
-| `onSuccess`            | `(data: T[]) => void`      | —       | Called with the full accumulated array after each fetch |
-| `onError`              | `(error: E) => void`       | —       | Called when all retries are exhausted                   |
-| `retryCount`           | `number`                   | —       | Retries on failure                                      |
-| `retryDelay`           | `number`                   | —       | ms between retries                                      |
-| `staleTime`            | `number`                   | —       | ms before data is considered stale                      |
-| `cacheTime`            | `number`                   | —       | ms to keep cache after last subscriber leaves           |
-| `refetchInterval`      | `number`                   | —       | Auto-refetch interval in ms                             |
-| `refetchOnWindowFocus` | `boolean`                  | `false` | Refetch when window regains focus                       |
+| Option                 | Type                       | Default | Description                                                                                               |
+| ---------------------- | -------------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| `pageSize`             | `number`                   | `10`    | Items per page                                                                                            |
+| `key`                  | `string`                   | auto    | Deduplication key — concurrent calls with matching params share one request                               |
+| `enabled`              | `boolean \| () => boolean` | `true`  | Disable fetching until ready                                                                              |
+| `initialData`          | `T[]`                      | —       | Seed data before the first fetch                                                                          |
+| `keepPreviousData`     | `boolean`                  | `false` | Show previous data while next page loads                                                                  |
+| `scoped`               | `boolean`                  | `false` | Give each consumer its own isolated instance — see [Scoped Chunks](/docs/async/async-chunk#scoped-chunks) |
+| `onSuccess`            | `(data: T[]) => void`      | —       | Called with the full accumulated array after each fetch                                                   |
+| `onError`              | `(error: E) => void`       | —       | Called when all retries are exhausted                                                                     |
+| `retryCount`           | `number`                   | —       | Retries on failure                                                                                        |
+| `retryDelay`           | `number`                   | —       | ms between retries                                                                                        |
+| `staleTime`            | `number`                   | —       | ms before data is considered stale                                                                        |
+| `cacheTime`            | `number`                   | —       | ms to keep cache after last subscriber leaves — only evicted once no subscribers remain                   |
+| `refetchInterval`      | `number`                   | —       | Auto-refetch interval in ms                                                                               |
+| `refetchOnWindowFocus` | `boolean`                  | `false` | Refetch when window regains focus                                                                         |
 
 ---
 
