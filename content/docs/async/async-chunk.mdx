@@ -36,21 +36,22 @@ Fetchers with no parameters are called automatically on creation. Fetchers that 
 
 ## Options
 
-| Option                 | Type                                           | Default   | Description                                                                       |
-| ---------------------- | ---------------------------------------------- | --------- | --------------------------------------------------------------------------------- |
-| `key`                  | `string`                                       | auto      | Deduplication key — concurrent calls share one request                            |
-| `enabled`              | `boolean \| ((params: Partial<P>) => boolean)` | `true`    | Disable fetching until ready — receives current params                            |
-| `initialData`          | `T`                                            | `null`    | Seed data before the first fetch                                                  |
-| `keepPreviousData`     | `boolean`                                      | `false`   | Show previous data while refetching — no UI flicker                               |
-| `clearOnParamChange`   | `boolean`                                      | `false`   | Clear data to `null` immediately when params change — eliminates stale data flash |
-| `onSuccess`            | `(data: T) => void`                            | —         | Called after every successful fetch                                               |
-| `onError`              | `(error: E) => void`                           | —         | Called when all retries are exhausted                                             |
-| `retryCount`           | `number`                                       | `0`       | Number of retries on failure                                                      |
-| `retryDelay`           | `number`                                       | `1000`    | ms between retries                                                                |
-| `staleTime`            | `number`                                       | `0`       | ms before data is considered stale                                                |
-| `cacheTime`            | `number`                                       | `300_000` | ms to keep cache after last subscriber leaves                                     |
-| `refetchInterval`      | `number`                                       | —         | Auto-refetch interval in ms                                                       |
-| `refetchOnWindowFocus` | `boolean`                                      | `false`   | Refetch when window regains focus                                                 |
+| Option                 | Type                                           | Default   | Description                                                                                                                                  |
+| ---------------------- | ---------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| `key`                  | `string`                                       | auto      | Deduplication key — concurrent calls with matching params share one request                                                                  |
+| `enabled`              | `boolean \| ((params: Partial<P>) => boolean)` | `true`    | Disable fetching until ready — receives current params                                                                                       |
+| `initialData`          | `T`                                            | `null`    | Seed data before the first fetch                                                                                                             |
+| `keepPreviousData`     | `boolean`                                      | `false`   | Show previous data while refetching — no UI flicker                                                                                          |
+| `clearOnParamChange`   | `boolean`                                      | `false`   | Clear data to `null` immediately when params change — eliminates stale data flash                                                            |
+| `scoped`               | `boolean`                                      | `false`   | Give each `useAsyncChunk` caller its own isolated instance instead of sharing this chunk's state — see [Scoped Chunks](#scoped-chunks) below |
+| `onSuccess`            | `(data: T) => void`                            | —         | Called after every successful fetch                                                                                                          |
+| `onError`              | `(error: E) => void`                           | —         | Called when all retries are exhausted                                                                                                        |
+| `retryCount`           | `number`                                       | `0`       | Number of retries on failure                                                                                                                 |
+| `retryDelay`           | `number`                                       | `1000`    | ms between retries                                                                                                                           |
+| `staleTime`            | `number`                                       | `0`       | ms before data is considered stale                                                                                                           |
+| `cacheTime`            | `number`                                       | `300_000` | ms to keep cache after last subscriber leaves                                                                                                |
+| `refetchInterval`      | `number`                                       | —         | Auto-refetch interval in ms                                                                                                                  |
+| `refetchOnWindowFocus` | `boolean`                                      | `false`   | Refetch when window regains focus                                                                                                            |     |
 
 <Callout type="info">
   All options except `key`, `enabled`, `initialData`, `keepPreviousData`,
@@ -188,6 +189,54 @@ const userChunk = asyncChunk(fetchUser, { key: "user" });
 userChunk.reload();
 userChunk.reload(); // joins the same in-flight request
 ```
+
+---
+
+---
+
+## Scoped chunks
+
+By default, an `asyncChunk` is a singleton — every component that reads it via `useAsyncChunk` shares the same `data`, `loading`, `pagination`, and params. That's correct for genuinely global state (current user, wallet balance, notification list): a mutation from one place should be visible everywhere.
+
+It's the wrong default for **parameterized or filtered lists** used by multiple components at once — a search page, a paginated table with a status filter, a per-tab list. Two components sharing one singleton chunk will fight over `setParams`, `nextPage`, and cached data, since there's only one shared state underneath.
+
+Set `scoped: true` to opt a chunk into per-consumer isolation. The export stays exactly the same — no factory function, no `useState` wrapper needed at the call site:
+
+```ts
+export const searchResultsChunk = paginatedAsyncChunk(
+  async (params: { page: number; pageSize: number; query?: string }) => {
+    const res = await api.search(params);
+    return { data: res.items, hasMore: res.hasMore };
+  },
+  {
+    pagination: { pageSize: 20, mode: "replace" },
+    scoped: true,
+  },
+);
+```
+
+```tsx
+function SearchTab() {
+  // Each component using this chunk gets its own independent instance —
+  // one tab's page/filter state never leaks into another's.
+  const { data, setParams, nextPage } = useAsyncChunk(searchResultsChunk);
+}
+```
+
+<Callout type="warn">
+  Only `useAsyncChunk`/`useInfiniteAsyncChunk` resolve `scoped` transparently.
+  Calling methods directly on the exported chunk (`searchResultsChunk.reload()`
+  outside a component) still operates on the one shared singleton instance,
+  since scoping is a hook-level behavior, not a chunk-level state split.
+</Callout>
+
+**When to use `scoped`:**
+
+| Use case                                                                                                                    | `scoped`                            |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Current user, wallet, notifications — one per app                                                                           | `false` (default)                   |
+| Paginated/filtered list shown by exactly one screen                                                                         | `false` (default) — fine either way |
+| Same paginated/filtered chunk used by multiple simultaneous components (tabs, split views, tables with independent filters) | `true`                              |
 
 ---
 
