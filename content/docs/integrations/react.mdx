@@ -163,11 +163,6 @@ function PostList() {
 | `onSuccess`    | `(data: T) => void`  | Called after every successful fetch. Has full React context access.   |
 | `onError`      | `(error: E) => void` | Called when a fetch fails. Has full React context access.             |
 
-<Callout type="info">
-  `initialParams` is deprecated — use `params` instead. It will be removed in v3
-  stable.
-</Callout>
-
 ---
 
 ### Where to put `enabled` — chunk level vs hook level
@@ -231,24 +226,24 @@ function ProfilePage() {
 
 ### Return value
 
-|                     | Type                         | Description                                              |
-| ------------------- | ---------------------------- | -------------------------------------------------------- |
-| `data`              | `T \| null`                  | Resolved data                                            |
-| `loading`           | `boolean`                    | `true` while fetching                                    |
-| `error`             | `E \| null`                  | Error from last failed fetch                             |
-| `lastFetched`       | `number \| undefined`        | Timestamp of last successful fetch                       |
-| `isPlaceholderData` | `boolean`                    | `true` when showing stale data during refetch            |
-| `reload`            | `(params?) => Promise<void>` | Force refetch                                            |
-| `refresh`           | `(params?) => Promise<void>` | Refetch if stale                                         |
-| `mutate`            | `(mutator) => void`          | Update data directly                                     |
-| `reset`             | `() => void`                 | Reset to initial state                                   |
-| `setParams`         | `(params) => void`           | Update params and refetch _(if chunk accepts params)_    |
-| `clearParams`       | `() => void`                 | Clear all params and refetch _(if chunk accepts params)_ |
-| `pagination`        | `PaginationState`            | Current pagination state _(if paginated)_                |
-| `nextPage`          | `() => Promise<void>`        | Load next page _(if paginated)_                          |
-| `prevPage`          | `() => Promise<void>`        | Load previous page _(if paginated)_                      |
-| `goToPage`          | `(page) => Promise<void>`    | Jump to a page _(if paginated)_                          |
-| `resetPagination`   | `() => Promise<void>`        | Reset to page 1 _(if paginated)_                         |
+|                     | Type                          | Description                                                                   |
+| ------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `data`              | `T \| null`                   | Resolved data                                                                 |
+| `loading`           | `boolean`                     | `true` while fetching                                                         |
+| `error`             | `E \| null`                   | Error from last failed fetch                                                  |
+| `lastFetched`       | `number \| undefined`         | Timestamp of last successful fetch                                            |
+| `isPlaceholderData` | `boolean`                     | `true` when showing stale data during refetch                                 |
+| `reload`            | `(params?) => Promise<void>`  | Force refetch                                                                 |
+| `refresh`           | `(params?) => Promise<void>`  | Refetch if stale                                                              |
+| `mutate`            | `(mutator) => void`           | Update data directly                                                          |
+| `reset`             | `(refetch?: boolean) => void` | Reset to initial state. Refetches by default unless `reset(false)` is passed. |
+| `setParams`         | `(params) => void`            | Update params and refetch _(if chunk accepts params)_                         |
+| `clearParams`       | `() => void`                  | Clear all params and refetch _(if chunk accepts params)_                      |
+| `pagination`        | `PaginationState`             | Current pagination state _(if paginated)_                                     |
+| `nextPage`          | `() => Promise<void>`         | Load next page _(if paginated)_                                               |
+| `prevPage`          | `() => Promise<void>`         | Load previous page _(if paginated)_                                           |
+| `goToPage`          | `(page) => Promise<void>`     | Jump to a page _(if paginated)_                                               |
+| `resetPagination`   | `() => Promise<void>`         | Reset to page 1 _(if paginated)_                                              |
 
 <Callout type="info">
   `useAsyncChunk` automatically calls `cleanup()` when the component unmounts —
@@ -371,12 +366,13 @@ function PostFeed() {
 
 ### Options
 
-| Option          | Type      | Default | Description                                                                             |
-| --------------- | --------- | ------- | --------------------------------------------------------------------------------------- |
-| `autoLoad`      | `boolean` | `true`  | Auto-load next page when sentinel is visible                                            |
-| `threshold`     | `number`  | `1.0`   | Intersection observer threshold                                                         |
-| `params`        | `object`  | —       | Reactive params (excluding `page` and `pageSize`). Re-fetches from page 1 when changed. |
-| `initialParams` | `object`  | —       | Deprecated — use `params` instead                                                       |
+### Options
+
+| Option      | Type      | Default | Description                                                                             |
+| ----------- | --------- | ------- | --------------------------------------------------------------------------------------- |
+| `autoLoad`  | `boolean` | `true`  | Auto-load next page when sentinel is visible                                            |
+| `threshold` | `number`  | `1.0`   | Intersection observer threshold                                                         |
+| `params`    | `object`  | —       | Reactive params (excluding `page` and `pageSize`). Re-fetches from page 1 when changed. |
 
 ---
 
