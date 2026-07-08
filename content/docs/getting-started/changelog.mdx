@@ -13,6 +13,65 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ---
 
+## [3.1.0] - 2026-07-08
+
+### Added
+
+- **`scoped` option** on `asyncChunk` and `paginatedAsyncChunk` — when `true`, `useAsyncChunk`/`useInfiniteAsyncChunk` transparently give each calling component its own isolated instance instead of sharing the exported chunk's state. The export syntax is unchanged — no factory function or `useState` wrapper needed at the call site.
+
+```ts
+export const searchResultsChunk = paginatedAsyncChunk(fetcher, {
+  pagination: { pageSize: 20, mode: "replace" },
+  scoped: true,
+});
+
+// Each component using searchResultsChunk now gets independent
+// data/pagination/params state.
+```
+
+Use `scoped: true` for parameterized or filtered data (search results, tables with independent filters, multiple simultaneous tabs) where sharing one singleton across consumers causes them to fight over `setParams`/`nextPage`/cached data. Leave the default (`false`) for true app-wide singletons (current user, wallet, notifications) where every consumer must observe the same state.
+
+Only `useAsyncChunk`/`useInfiniteAsyncChunk` resolve `scoped` — calling methods directly on the exported chunk outside a component still operates on the one shared singleton instance.
+
+- `reset(refetch?: boolean)` — `reset()` now accepts an optional parameter (default `true`) controlling whether it triggers a refetch after clearing state. Pass `reset(false)` for flows like logout, where state should clear without firing an unauthenticated request.
+
+```ts
+notificationsChunk.reset(); // clears and refetches (default)
+notificationsChunk.reset(false); // clears only — no refetch
+```
+
+### Fixed
+
+- **`reload()` now resets pagination cursor and page to initial state.** Previously, `reload()` reused whatever cursor/page was left over from the last `nextPage()` call, so repeated `reload()` calls (from SSE updates, login, component remounts) silently advanced through pages instead of always returning to page 1 — the most common symptom being a paginated list quietly swapping to unrelated data on refresh.
+- **In-flight request deduplication is now keyed by params, not just the chunk key.** Two calls to `fetchData` with different params (e.g. an unfiltered mount-time `reload()` immediately followed by a filtered `setParams()`) previously deduped onto the same in-flight promise, since only the chunk's key was used for lookup. The second, correct request silently never reached the network — only the first (wrong) response was ever applied. This is the root cause behind filters not applying on first page load in some apps.
+- **`cancel()` updated to match the new params-aware dedup key** — it previously deleted the in-flight entry under the old bare chunk-key, which no longer matched anything after the dedup fix above, leaving stale in-flight promises un-cancellable.
+- **Cache eviction (`cacheTime`) is now gated by active subscriber count.** Previously, `cacheTime` scheduled an unconditional `clearCache()` regardless of whether the chunk still had active subscribers — so live, in-use data could silently be wiped to `null` mid-session once the timer elapsed, even while a component was still mounted and displaying it. Eviction now only fires once `subscriberCount` reaches zero, matching the documented intent of "cache retained after last subscriber leaves."
+- **`fetchOnMount` no longer bypasses `enabled` in `useAsyncChunk`.** The mount effect's condition previously short-circuited on `fetchOnMount` alone (`fom || (...)`), ignoring `enabled` entirely — chunks configured with both `fetchOnMount: true` and `enabled: someCondition` (e.g. `isLoggedIn`) fetched on mount even when the condition was false, producing unauthenticated requests immediately after logout + refresh. Now correctly requires `enabled && (fom || ...)`.
+- **`reset()` now refetches paginated chunks.** Previously `reset()` only auto-refetched when the fetcher took no params (`!expectsParams`), which unconditionally skipped every paginated chunk (their fetcher signature always expects `page`/`pageSize`/`cursor`). Paginated chunks manage pagination internally and don't need external params to refetch, so they're now included.
+- **`useAsyncChunk` resolves scoped/passed-in chunk instances via `useMemo` keyed on the chunk reference**, not a one-time `useState` initializer — restoring correct behavior when a component rerenders with a genuinely different chunk instance (e.g. switching from a paginated to a non-paginated chunk, or vice versa).
+
+### Removed
+
+- **`initialParams` fully removed** from `UseAsyncChunkOptions` and `UseInfiniteAsyncChunkOptions`. It has been deprecated since 3.0.0-rc.10 in favor of `params`; both the type and the runtime fallback are now gone. Update any remaining `useAsyncChunk(chunk, { initialParams })` call sites to `useAsyncChunk(chunk, { params })`.
+
+---
+
+## [3.0.6] - 2026-07-01
+
+### Fixed
+
+- 403 responses are now tagged `nonRetryable` at the HTTP-client layer and `fetchData`'s retry loop respects it — a 403 (permission denied) no longer burns through `retryCount` attempts that cannot possibly succeed, since retrying with the same token changes nothing. (This pattern is app-level — see your HTTP client's response interceptor — but `asyncChunk`'s retry logic now checks `error.nonRetryable` before retrying.)
+
+---
+
+## [3.0.3] - 2026-06-27
+
+### Fixed
+
+- `reload()` did not previously reset a paginated chunk's `cursor`/`page` before fetching, causing chained calls to silently advance through pages — see the fuller writeup under [3.1.0](#310---2026-07-08) above, first fixed here and hardened further in 3.1.0.
+
+---
+
 ## [3.0.2] - 2026-06-25
 
 ### Added
@@ -142,7 +201,7 @@ variable, forcing a manual cast at every call site:
 // rc.9 and earlier — required a cast
 const usersChunk = asyncChunk(fetchUsers, {
   pagination: { pageSize: 10 },
-}) as PaginatedParamAsyncChunk<
+}) as PaginatedParamAsyncChunk
   User[],
   Error,
   { page: number; pageSize: number }
@@ -348,14 +407,17 @@ count.set((n) => n + 1); // update() removed
 
 ## Release History
 
-| Version             | Status        | Highlights                                                               |
-| ------------------- | ------------- | ------------------------------------------------------------------------ |
-| `3.0.2`             | ✅ Latest     | `clearOnParamChange`, double-fetch fix, mutate type fix                  |
-| `3.0.1`             | ✅ Stable     | `cancel()`, enabled flip fixes                                           |
-| `3.0.0-rc.11`       | 🚧 RC         | Cursor-based pagination support                                          |
-| `3.0.0-rc.10`       | 🚧 RC         | `paginatedAsyncChunk` split, fetchOnMount default, params forwarding fix |
-| `3.0.0-rc.4 – rc.9` | 🚧 RC         | Reactive `enabled`, accumulate-mode fix, `invalidates` pagination fix    |
-| `3.0.0-alpha`       | 🚧 Alpha      | Computed redesign, stunk/query, strict mode, null values                 |
-| `2.8.1`             | ✅ Stable     | Latest stable, 2.95kB gzipped                                            |
-| `2.x`               | ✅ Stable     | Full React integration, async, middleware, time travel                   |
-| `1.x`               | ⚠️ Deprecated | Early API, no longer supported                                           |
+| Version             | Status        | Highlights                                                                                                       |
+| ------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `3.1.0`             | ✅ Latest     | `scoped` option, `reset(refetch)`, dedup-by-params fix, subscriber-gated cache eviction, `initialParams` removed |
+| `3.0.6`             | ✅ Stable     | 403 tagged `nonRetryable`, skipped in retry loop                                                                 |
+| `3.0.3`             | ✅ Stable     | `reload()` cursor/page reset fix                                                                                 |
+| `3.0.2`             | ✅ Stable     | `clearOnParamChange`, double-fetch fix, mutate type fix                                                          |
+| `3.0.1`             | ✅ Stable     | `cancel()`, enabled flip fixes                                                                                   |
+| `3.0.0-rc.11`       | 🚧 RC         | Cursor-based pagination support                                                                                  |
+| `3.0.0-rc.10`       | 🚧 RC         | `paginatedAsyncChunk` split, fetchOnMount default, params forwarding fix                                         |
+| `3.0.0-rc.4 – rc.9` | 🚧 RC         | Reactive `enabled`, accumulate-mode fix, `invalidates` pagination fix                                            |
+| `3.0.0-alpha`       | 🚧 Alpha      | Computed redesign, stunk/query, strict mode, null values                                                         |
+| `2.8.1`             | ✅ Stable     | Latest stable, 2.95kB gzipped                                                                                    |
+| `2.x`               | ✅ Stable     | Full React integration, async, middleware, time travel                                                           |
+| `1.x`               | ⚠️ Deprecated | Early API, no longer supported                                                                                   |
